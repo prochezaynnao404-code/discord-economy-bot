@@ -1,13 +1,19 @@
 {
   "name": "discord-economy-bot",
   "version": "1.0.0",
+  "description": "Discord Economy Bot",
   "main": "index.js",
+
   "scripts": {
     "start": "node index.js"
   },
+
+  "type": "commonjs",
+
   "engines": {
     "node": "20.x"
   },
+
   "dependencies": {
     "discord.js": "^14.21.0",
     "dotenv": "^17.2.1",

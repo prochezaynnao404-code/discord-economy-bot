@@ -3,9 +3,6 @@ const {
     EmbedBuilder
 } = require("discord.js");
 
-const createUser =
-    require("../utils/createUser");
-
 module.exports = {
 
     data: new SlashCommandBuilder()
@@ -13,7 +10,7 @@ module.exports = {
         .setName("daily")
 
         .setDescription(
-            "Récompense journalière"
+            "Récupère ton daily"
         ),
 
     async execute(interaction) {
@@ -21,98 +18,156 @@ module.exports = {
         const db =
             interaction.client.db;
 
-        createUser(
-            db,
-            interaction.user.id,
+        const userId =
+            interaction.user.id;
 
-            () => {
+        db.get(
+            "SELECT * FROM users WHERE userId = ?",
+            [userId],
 
-                db.get(
-                    "SELECT * FROM users WHERE userId = ?",
-                    [interaction.user.id],
+            (err, user) => {
 
-                    (err, row) => {
+                if (!user) {
 
-                        const now =
-                            Date.now();
+                    db.run(
+                        `
+                        INSERT INTO users (
+                            userId
+                        )
+                        VALUES (?)
+                        `,
+                        [userId]
+                    );
 
-                        const last =
-                            row.lastDaily;
+                    return interaction.reply({
 
-                        const cooldown =
-                            86400000;
+                        content:
+                            "Réessaie la commande.",
 
-                        if (
-                            now - last
-                            < cooldown
-                        ) {
+                        flags: 64
+                    });
+                }
 
-                            return interaction.reply({
+                const now =
+                    Date.now();
 
-                                content:
-                                    "⏳ Déjà récupéré aujourd'hui.",
+                const cooldown =
+                    86400000;
 
-                                ephemeral: true
-                            });
-                        }
+                // COOLDOWN
 
-                        let streak =
-                            row.streak + 1;
+                if (
+                    user.lastDaily
+                    && now - user.lastDaily
+                    < cooldown
+                ) {
 
-                        let multiplier =
-                            1;
-
-                        if (
-                            streak >= 10
-                        ) {
-
-                            multiplier = 2;
-                        }
-
-                        const reward =
-                            5000
-                            * multiplier;
-
-                        db.run(
-                            `UPDATE users
-                            SET money = money + ?,
-                            streak = ?,
-                            multiplier = ?,
-                            lastDaily = ?
-                            WHERE userId = ?`,
-                            [
-                                reward,
-                                streak,
-                                multiplier,
-                                now,
-                                interaction.user.id
-                            ]
+                    const timeLeft =
+                        cooldown -
+                        (
+                            now
+                            - user.lastDaily
                         );
 
-                        const embed =
+                    const hours =
+                        Math.floor(
+                            timeLeft / 3600000
+                        );
+
+                    const minutes =
+                        Math.floor(
+                            (
+                                timeLeft
+                                % 3600000
+                            ) / 60000
+                        );
+
+                    return interaction.reply({
+
+                        embeds: [
+
                             new EmbedBuilder()
 
-                            .setTitle(
-                                "🎁 Daily"
-                            )
+                            .setColor("Red")
 
-                            .setColor(
-                                "Blue"
+                            .setTitle(
+                                "⏳ DAILY"
                             )
 
                             .setDescription(
-`💰 Gain : ${reward}$
+`Reviens dans
+${hours}h ${minutes}m`
+                            )
+                        ],
 
-🔥 Streak : ${streak}
+                        flags: 64
+                    });
+                }
 
-⚡ Multiplicateur : x${multiplier}`
-                            );
+                // STREAK
 
-                        interaction.reply({
-                            embeds: [embed]
-                        });
-                    }
+                let streak =
+                    (
+                        user.dailyStreak
+                        || 0
+                    ) + 1;
+
+                let reward =
+                    500;
+
+                // BONUS X2
+
+                if (
+                    streak >= 10
+                ) {
+
+                    reward *= 2;
+
+                    streak = 0;
+                }
+
+                const newMoney =
+                    user.money + reward;
+
+                db.run(
+                    `
+                    UPDATE users
+
+                    SET money = ?,
+                    lastDaily = ?,
+                    dailyStreak = ?
+
+                    WHERE userId = ?
+                    `,
+                    [
+                        newMoney,
+                        now,
+                        streak,
+                        userId
+                    ]
                 );
+
+                interaction.reply({
+
+                    embeds: [
+
+                        new EmbedBuilder()
+
+                        .setColor("Green")
+
+                        .setTitle(
+                            "🎁 DAILY"
+                        )
+
+                        .setDescription(
+`💰 Gain :
+${reward}$
+
+🔥 Série :
+${streak}/10`
+                        )
+                    ]
+                });
             }
         );
     }

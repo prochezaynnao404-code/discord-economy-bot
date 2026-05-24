@@ -15,8 +15,9 @@ const {
 const sqlite3 =
     require("sqlite3").verbose();
 
-const createUser =
-    require("./utils/createUser");
+// =========================
+// CLIENT
+// =========================
 
 const client = new Client({
 
@@ -49,7 +50,7 @@ const db =
 client.db = db;
 
 // =========================
-// USERS TABLE
+// CREATE TABLE
 // =========================
 
 db.run(`
@@ -71,15 +72,38 @@ CREATE TABLE IF NOT EXISTS users (
 
     lastDaily INTEGER DEFAULT 0,
 
+    dailyStreak INTEGER DEFAULT 0,
+
     activeQuest TEXT DEFAULT 'none',
 
     questProgress INTEGER DEFAULT 0,
 
     questGoal INTEGER DEFAULT 0,
 
-    questCompleted INTEGER DEFAULT 0
+    questCompleted INTEGER DEFAULT 0,
+
+    lastRob INTEGER DEFAULT 0,
+
+    lastWork INTEGER DEFAULT 0
 )
 `);
+
+// =========================
+// CREATE USER
+// =========================
+
+function createUser(userId) {
+
+    db.run(
+        `
+        INSERT OR IGNORE INTO users (
+            userId
+        )
+        VALUES (?)
+        `,
+        [userId]
+    );
+}
 
 // =========================
 // LOAD COMMANDS
@@ -95,6 +119,21 @@ for (const file of commandFiles) {
 
     const command =
         require(`./slashCommands/${file}`);
+
+    // CHECK COMMAND
+
+    if (
+        !command.data
+        || !command.execute
+    ) {
+
+        console.log(
+            `❌ Commande invalide :
+${file}`
+        );
+
+        continue;
+    }
 
     client.commands.set(
         command.data.name,
@@ -112,10 +151,233 @@ client.once(
     () => {
 
         console.log(
-            `✅ Connecté : ${client.user.tag}`
+            `✅ Connecté :
+${client.user.tag}`
         );
     }
 );
+
+// =========================
+// MESSAGE MONEY + XP
+// =========================
+
+const messageCooldown =
+    new Set();
+
+client.on(
+    "messageCreate",
+
+    async message => {
+
+        if (
+            message.author.bot
+        ) return;
+
+        const userId =
+            message.author.id;
+
+        createUser(userId);
+
+        // ANTI SPAM
+
+        if (
+            messageCooldown.has(userId)
+        ) return;
+
+        messageCooldown.add(
+            userId
+        );
+
+        setTimeout(() => {
+
+            messageCooldown.delete(
+                userId
+            );
+
+        }, 30000);
+
+        db.get(
+            "SELECT * FROM users WHERE userId = ?",
+            [userId],
+
+            (err, row) => {
+
+                if (!row) return;
+
+                const gain =
+                    Math.floor(
+                        Math.random() * 50
+                    ) + 10;
+
+                let xp =
+                    row.xp + 5;
+
+                let level =
+                    row.level;
+
+                // LEVEL UP
+
+                if (
+                    xp >= level * 100
+                ) {
+
+                    xp = 0;
+
+                    level++;
+
+                    message.channel.send(
+`⭐ ${message.author.username}
+est passé niveau ${level}`
+                    );
+                }
+
+                // QUESTS
+
+                let progress =
+                    row.questProgress;
+
+                let completed =
+                    row.questCompleted;
+
+                if (
+                    row.activeQuest
+                    === "messages"
+                ) {
+
+                    progress++;
+
+                    if (
+                        progress >= row.questGoal
+                    ) {
+
+                        progress =
+                            row.questGoal;
+
+                        completed = 1;
+
+                        message.channel.send(
+`🎯 ${message.author}
+a terminé sa quête messages`
+                        );
+                    }
+                }
+
+                db.run(
+                    `
+                    UPDATE users
+
+                    SET money = money + ?,
+                    xp = ?,
+                    level = ?,
+                    questProgress = ?,
+                    questCompleted = ?
+
+                    WHERE userId = ?
+                    `,
+                    [
+                        gain,
+                        xp,
+                        level,
+                        progress,
+                        completed,
+                        userId
+                    ]
+                );
+            }
+        );
+    }
+);
+
+// =========================
+// VOCAL MONEY
+// =========================
+
+setInterval(() => {
+
+    client.guilds.cache.forEach(
+        guild => {
+
+            guild.members.cache.forEach(
+                member => {
+
+                    if (
+                        member.user.bot
+                    ) return;
+
+                    if (
+                        !member.voice.channel
+                    ) return;
+
+                    createUser(
+                        member.id
+                    );
+
+                    db.get(
+                        "SELECT * FROM users WHERE userId = ?",
+                        [member.id],
+
+                        (err, row) => {
+
+                            if (!row)
+                                return;
+
+                            const gain =
+                                Math.floor(
+                                    Math.random() * 100
+                                ) + 50;
+
+                            let progress =
+                                row.questProgress;
+
+                            let completed =
+                                row.questCompleted;
+
+                            // VOCAL QUEST
+
+                            if (
+                                row.activeQuest
+                                === "vocal"
+                            ) {
+
+                                progress += 10;
+
+                                if (
+                                    progress >= row.questGoal
+                                ) {
+
+                                    progress =
+                                        row.questGoal;
+
+                                    completed = 1;
+                                }
+                            }
+
+                            db.run(
+                                `
+                                UPDATE users
+
+                                SET money = money + ?,
+                                xp = xp + 10,
+                                questProgress = ?,
+                                questCompleted = ?
+
+                                WHERE userId = ?
+                                `,
+                                [
+                                    gain,
+                                    progress,
+                                    completed,
+                                    member.id
+                                ]
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+
+}, 600000);
 
 // =========================
 // INTERACTIONS
@@ -171,14 +433,12 @@ client.on(
                         content:
 `🃏 BLACKJACK
 
-👤 Total : ${player}
-🤖 Dealer : ${dealer}
+👤 ${player}
+🤖 ${dealer}
 
 ❌ BUST
 
 💸 -${bet}$`,
-
-                        embeds: [],
 
                         components: []
                     });
@@ -189,9 +449,11 @@ client.on(
                 if (player === 21) {
 
                     db.run(
-                        `UPDATE users
+                        `
+                        UPDATE users
                         SET money = money + ?
-                        WHERE userId = ?`,
+                        WHERE userId = ?
+                        `,
                         [
                             bet * 2,
                             interaction.user.id
@@ -203,23 +465,18 @@ client.on(
                         content:
 `🃏 BLACKJACK
 
-👤 Total : 21
-🤖 Dealer : ${dealer}
+👤 21
+🤖 ${dealer}
 
 🎉 BLACKJACK
 
-💰 +${bet * 2}$
-
-📈 Profit :
-+${bet}$`,
-
-                        embeds: [],
+💰 +${bet * 2}$`,
 
                         components: []
                     });
                 }
 
-                // CONTINUE
+                // CONTINUE GAME
 
                 const buttons =
                     new ActionRowBuilder()
@@ -256,16 +513,14 @@ client.on(
                     content:
 `🃏 BLACKJACK
 
-👤 Total : ${player}
-🤖 Dealer : ${dealer}
+👤 ${player}
+🤖 ${dealer}
 
 🆕 Carte :
 ${card}
 
 💰 Mise :
 ${bet}$`,
-
-                    embeds: [],
 
                     components: [
                         buttons
@@ -311,9 +566,11 @@ ${bet}$`,
                 ) {
 
                     db.run(
-                        `UPDATE users
+                        `
+                        UPDATE users
                         SET money = money + ?
-                        WHERE userId = ?`,
+                        WHERE userId = ?
+                        `,
                         [
                             bet * 2,
                             interaction.user.id
@@ -325,17 +582,12 @@ ${bet}$`,
                         content:
 `🃏 BLACKJACK
 
-👤 Toi : ${player}
-🤖 Dealer : ${dealer}
+👤 ${player}
+🤖 ${dealer}
 
 ✅ VICTOIRE
 
-💰 +${bet * 2}$
-
-📈 Profit :
-+${bet}$`,
-
-                        embeds: [],
+💰 +${bet * 2}$`,
 
                         components: []
                     });
@@ -348,9 +600,11 @@ ${bet}$`,
                 ) {
 
                     db.run(
-                        `UPDATE users
+                        `
+                        UPDATE users
                         SET money = money + ?
-                        WHERE userId = ?`,
+                        WHERE userId = ?
+                        `,
                         [
                             bet,
                             interaction.user.id
@@ -362,15 +616,12 @@ ${bet}$`,
                         content:
 `🃏 BLACKJACK
 
-👤 Toi : ${player}
-🤖 Dealer : ${dealer}
+👤 ${player}
+🤖 ${dealer}
 
 🤝 ÉGALITÉ
 
-💰 Mise remboursée :
-+${bet}$`,
-
-                        embeds: [],
+💰 +${bet}$`,
 
                         components: []
                     });
@@ -383,14 +634,12 @@ ${bet}$`,
                     content:
 `🃏 BLACKJACK
 
-👤 Toi : ${player}
-🤖 Dealer : ${dealer}
+👤 ${player}
+🤖 ${dealer}
 
 ❌ DÉFAITE
 
 💸 -${bet}$`,
-
-                    embeds: [],
 
                     components: []
                 });
@@ -432,7 +681,7 @@ ${bet}$`,
                     content:
                         "❌ Erreur commande.",
 
-                    ephemeral: true
+                    flags: 64
                 });
 
             } else {
@@ -442,234 +691,12 @@ ${bet}$`,
                     content:
                         "❌ Erreur commande.",
 
-                    ephemeral: true
+                    flags: 64
                 });
             }
         }
     }
 );
-
-// =========================
-// MESSAGE MONEY + QUESTS
-// =========================
-
-const messageCooldown =
-    new Set();
-
-client.on(
-    "messageCreate",
-
-    message => {
-
-        if (
-            message.author.bot
-        ) return;
-
-        const userId =
-            message.author.id;
-
-        createUser(
-            db,
-            userId
-        );
-
-        // ANTI SPAM
-
-        if (
-            messageCooldown.has(userId)
-        ) return;
-
-        messageCooldown.add(
-            userId
-        );
-
-        setTimeout(() => {
-
-            messageCooldown.delete(
-                userId
-            );
-
-        }, 30000);
-
-        const gain =
-            Math.floor(
-                Math.random() * 50
-            ) + 10;
-
-        db.get(
-            "SELECT * FROM users WHERE userId = ?",
-            [userId],
-
-            (err, row) => {
-
-                if (!row) return;
-
-                let xp =
-                    row.xp + 5;
-
-                let level =
-                    row.level;
-
-                // LEVEL UP
-
-                if (
-                    xp >= level * 100
-                ) {
-
-                    xp = 0;
-
-                    level++;
-
-                    message.channel.send(
-`⭐ ${message.author.username}
-est passé niveau ${level}`
-                    );
-                }
-
-                // QUEST PROGRESS
-
-                let progress =
-                    row.questProgress;
-
-                let completed =
-                    row.questCompleted;
-
-                if (
-                    row.activeQuest
-                    === "messages"
-                ) {
-
-                    progress++;
-
-                    if (
-                        progress >= row.questGoal
-                    ) {
-
-                        progress =
-                            row.questGoal;
-
-                        completed = 1;
-
-                        message.channel.send(
-`🎯 ${message.author}
-a terminé sa quête messages`
-                        );
-                    }
-                }
-
-                db.run(
-                    `UPDATE users
-
-                    SET money = money + ?,
-                    xp = ?,
-                    level = ?,
-                    questProgress = ?,
-                    questCompleted = ?
-
-                    WHERE userId = ?`,
-                    [
-                        gain,
-                        xp,
-                        level,
-                        progress,
-                        completed,
-                        userId
-                    ]
-                );
-            }
-        );
-    }
-);
-
-// =========================
-// VOCAL MONEY + QUESTS
-// =========================
-
-setInterval(() => {
-
-    client.guilds.cache.forEach(
-        guild => {
-
-            guild.members.cache.forEach(
-                member => {
-
-                    if (
-                        member.user.bot
-                    ) return;
-
-                    if (
-                        !member.voice.channel
-                    ) return;
-
-                    createUser(
-                        db,
-                        member.id
-                    );
-
-                    db.get(
-                        "SELECT * FROM users WHERE userId = ?",
-                        [member.id],
-
-                        (err, row) => {
-
-                            if (!row)
-                                return;
-
-                            const gain =
-                                Math.floor(
-                                    Math.random() * 100
-                                ) + 50;
-
-                            let progress =
-                                row.questProgress;
-
-                            let completed =
-                                row.questCompleted;
-
-                            // VOCAL QUEST
-
-                            if (
-                                row.activeQuest
-                                === "vocal"
-                            ) {
-
-                                progress += 10;
-
-                                if (
-                                    progress >= row.questGoal
-                                ) {
-
-                                    progress =
-                                        row.questGoal;
-
-                                    completed = 1;
-                                }
-                            }
-
-                            db.run(
-                                `UPDATE users
-
-                                SET money = money + ?,
-                                xp = xp + 10,
-                                questProgress = ?,
-                                questCompleted = ?
-
-                                WHERE userId = ?`,
-                                [
-                                    gain,
-                                    progress,
-                                    completed,
-                                    member.id
-                                ]
-                            );
-                        }
-                    );
-                }
-            );
-        }
-    );
-
-}, 600000);
 
 // =========================
 // LOGIN

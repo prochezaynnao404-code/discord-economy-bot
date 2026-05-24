@@ -52,7 +52,7 @@ module.exports = {
                     content:
 `🚔 Attends encore ${hours}h.`,
 
-                    ephemeral: true
+                    meral: true
                 });
             }
         }
@@ -206,7 +206,7 @@ Retape :
 
 ${lock}
 
-⏳ 15 secondes`
+⏳ 25 secondes`
                 );
 
                 const collector2 =
@@ -214,7 +214,7 @@ ${lock}
 
                         filter,
 
-                        time: 15000,
+                        time: 25000,
 
                         max: 1
                     });

@@ -42,7 +42,7 @@ module.exports = {
 📈 Progression :
 ${row.questProgress}/${row.questGoal}`,
 
-                        ephemeral: true
+                        flags: 64
                     });
                 }
 

@@ -59,7 +59,7 @@ module.exports = {
                 content:
                     "❌ Mise invalide.",
 
-                ephemeral: true
+                flags: 64
             });
         }
 
@@ -90,7 +90,7 @@ module.exports = {
                                 content:
                                     "❌ Pas assez d'argent.",
 
-                                ephemeral: true
+                                flags: 64
                             });
                         }
 

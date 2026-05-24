@@ -75,7 +75,7 @@ module.exports = {
                     content:
 `⏳ Tu dois attendre ${remaining} minutes.`,
 
-                    ephemeral: true
+                    meral: true
                 });
             }
         }
