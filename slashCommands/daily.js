@@ -113,7 +113,7 @@ ${hours}h ${minutes}m`
                     ) + 1;
 
                 let reward =
-                    500;
+                    5000;
 
                 // BONUS X2
 
