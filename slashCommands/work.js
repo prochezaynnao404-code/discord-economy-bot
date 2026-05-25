@@ -148,8 +148,8 @@ ${job.word}
 
                     const gain =
                         Math.floor(
-                            Math.random() * 2500
-                        ) + 500;
+                            Math.random() * 7500
+                        ) + 4500;
 
                     db.run(
                         `UPDATE users
