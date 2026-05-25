@@ -3,9 +3,6 @@ const {
     EmbedBuilder
 } = require("discord.js");
 
-const cooldowns =
-    new Map();
-
 module.exports = {
 
     data: new SlashCommandBuilder()
@@ -13,307 +10,402 @@ module.exports = {
         .setName("rob")
 
         .setDescription(
-            "Braquage hardcore"
+            "Braque une banque"
         ),
 
     async execute(interaction) {
 
+        const db =
+            interaction.client.db;
+
         const userId =
             interaction.user.id;
 
-        // =====================
-        // COOLDOWN 48H
-        // =====================
+        db.get(
+            "SELECT * FROM users WHERE userId = ?",
+            [userId],
 
-        const cooldown =
-            48 * 60 * 60 * 1000;
+            async (err, user) => {
 
-        if (
-            cooldowns.has(userId)
-        ) {
+                if (!user) {
 
-            const expiration =
-                cooldowns.get(userId)
-                + cooldown;
+                    return interaction.reply({
 
-            if (
-                Date.now()
-                < expiration
-            ) {
+                        content:
+                            "❌ Utilisateur introuvable.",
 
-                const hours =
-                    Math.ceil(
-                        (expiration - Date.now())
-                        / 3600000
-                    );
+                        flags: 64
+                    });
+                }
 
-                return interaction.reply({
+                const now =
+                    Date.now();
 
-                    content:
-`🚔 Attends encore ${hours}h.`,
+                const cooldown =
+                    172800000;
 
-                    meral: true
-                });
-            }
-        }
-
-        cooldowns.set(
-            userId,
-            Date.now()
-        );
-
-        // =====================
-        // PHASE 1
-        // =====================
-
-        const letters = [
-            "A",
-            "B",
-            "X",
-            "Y"
-        ];
-
-        let sequence =
-            "";
-
-        for (
-            let i = 0;
-            i < 6;
-            i++
-        ) {
-
-            sequence +=
-                letters[
-                    Math.floor(
-                        Math.random()
-                        * letters.length
-                    )
-                ] + " ";
-        }
-
-        const embed =
-            new EmbedBuilder()
-
-            .setTitle(
-                "🔫 BRAQUAGE"
-            )
-
-            .setColor(
-                "Red"
-            )
-
-            .setDescription(
-`🧠 Phase 1 — Sécurité
-
-Retape :
-
-${sequence}
-
-⏳ 12 secondes`
-            );
-
-        await interaction.reply({
-            embeds: [embed]
-        });
-
-        const filter =
-            m =>
-                m.author.id
-                === userId;
-
-        const collector1 =
-            interaction.channel.createMessageCollector({
-
-                filter,
-
-                time: 12000,
-
-                max: 1
-            });
-
-        collector1.on(
-            "collect",
-
-            msg => {
-
-                // =====================
-                // FAIL PHASE 1
-                // =====================
+                // ======================
+                // COOLDOWN
+                // ======================
 
                 if (
-                    msg.content.trim()
-                    !== sequence.trim()
+                    user.lastRob
+                    && now - user.lastRob
+                    < cooldown
                 ) {
 
-                    const db =
-                        interaction.client.db;
+                    const timeLeft =
+                        cooldown -
+                        (
+                            now
+                            - user.lastRob
+                        );
 
-                    const loss =
+                    const hours =
                         Math.floor(
-                            Math.random() * 10000
-                        ) + 5000;
+                            timeLeft / 3600000
+                        );
 
-                    db.run(
-                        `UPDATE users
-                        SET money = money - ?
-                        WHERE userId = ?`,
-                        [
-                            loss,
-                            userId
-                        ]
-                    );
+                    return interaction.reply({
 
-                    return msg.reply(
-`🚔 Alarme déclenchée
+                        embeds: [
 
-💸 -${loss}$`
-                    );
+                            new EmbedBuilder()
+
+                            .setColor("Red")
+
+                            .setTitle(
+                                "🚨 BRAQUAGE"
+                            )
+
+                            .setDescription(
+`⏳ Attends encore
+${hours} heures`
+                            )
+                        ],
+
+                        flags: 64
+                    });
                 }
 
-                // =====================
-                // PHASE 2
-                // =====================
+                // ======================
+                // PHASE 1
+                // ======================
 
-                const arrows = [
-                    "⬆️",
-                    "⬇️",
-                    "⬅️",
-                    "➡️"
+                const words = [
+
+                    "piratage",
+
+                    "banque",
+
+                    "discret",
+
+                    "infiltration",
+
+                    "alarme",
+
+                    "caméra"
                 ];
 
-                let lock =
-                    "";
+                const randomWord =
+                    words[
+                        Math.floor(
+                            Math.random()
+                            * words.length
+                        )
+                    ];
 
-                for (
-                    let i = 0;
-                    i < 5;
-                    i++
-                ) {
+                await interaction.reply({
 
-                    lock +=
-                        arrows[
-                            Math.floor(
-                                Math.random()
-                                * arrows.length
-                            )
-                        ] + " ";
-                }
+                    embeds: [
 
-                msg.reply(
-`🔓 Phase 2 — Crochetage
+                        new EmbedBuilder()
 
-Retape :
+                        .setColor("Orange")
 
-${lock}
+                        .setTitle(
+                            "🏦 PHASE 1"
+                        )
 
-⏳ 25 secondes`
-                );
+                        .setDescription(
+`Retape ce mot :
 
-                const collector2 =
-                    interaction.channel.createMessageCollector({
+\`${randomWord}\`
+
+⏳ 10 secondes`
+                        )
+                    ]
+                });
+
+                const filter =
+                    msg =>
+                        msg.author.id
+                        === interaction.user.id;
+
+                const collected =
+                    await interaction.channel.awaitMessages({
 
                         filter,
 
-                        time: 25000,
+                        max: 1,
 
-                        max: 1
-                    });
+                        time: 10000,
 
-                collector2.on(
-                    "collect",
+                        errors: ["time"]
+                    })
 
-                    msg2 => {
+                    .catch(() => null);
 
-                        const db =
-                            interaction.client.db;
-
-                        // SUCCESS
-
-                        if (
-                            msg2.content.trim()
-                            === lock.trim()
-                        ) {
-
-                            const gain =
-                                Math.floor(
-                                    Math.random() * 30000
-                                ) + 10000;
-
-                            db.run(
-                                `UPDATE users
-                                SET money = money + ?
-                                WHERE userId = ?`,
-                                [
-                                    gain,
-                                    userId
-                                ]
-                            );
-
-                            msg2.reply(
-`💰 BRAQUAGE RÉUSSI
-
-+${gain}$`
-                            );
-
-                        } else {
-
-                            // FAIL PHASE 2
-
-                            const loss =
-                                Math.floor(
-                                    Math.random() * 15000
-                                ) + 5000;
-
-                            db.run(
-                                `UPDATE users
-                                SET money = money - ?
-                                WHERE userId = ?`,
-                                [
-                                    loss,
-                                    userId
-                                ]
-                            );
-
-                            msg2.reply(
-`🚔 Mauvais crochetage
-
-💸 -${loss}$`
-                            );
-                        }
-                    }
-                );
-
-                collector2.on(
-                    "end",
-
-                    collected => {
-
-                        if (
-                            collected.size === 0
-                        ) {
-
-                            interaction.followUp(
-                                "⏰ Temps écoulé."
-                            );
-                        }
-                    }
-                );
-            }
-        );
-
-        collector1.on(
-            "end",
-
-            collected => {
+                // FAIL
 
                 if (
-                    collected.size === 0
+                    !collected
                 ) {
 
-                    interaction.followUp(
-                        "⏰ Braquage annulé."
-                    );
+                    return interaction.followUp({
+
+                        content:
+                            "🚨 Temps écoulé.",
+
+                        flags: 64
+                    });
                 }
+
+                const answer =
+                    collected.first().content;
+
+                if (
+                    answer.toLowerCase()
+                    !== randomWord
+                ) {
+
+                    return interaction.followUp({
+
+                        content:
+                            "🚨 Mauvais mot.\nLa police arrive.",
+
+                        flags: 64
+                    });
+                }
+
+                // ======================
+                // PHASE 2
+                // ======================
+
+                const code =
+                    Math.floor(
+                        1000 + Math.random() * 9000
+                    ).toString();
+
+                await interaction.followUp({
+
+                    embeds: [
+
+                        new EmbedBuilder()
+
+                        .setColor("Red")
+
+                        .setTitle(
+                            "🔓 PHASE 2"
+                        )
+
+                        .setDescription(
+`Retape ce code :
+
+\`${code}\`
+
+⏳ 8 secondes`
+                        )
+                    ]
+                });
+
+                const collected2 =
+                    await interaction.channel.awaitMessages({
+
+                        filter,
+
+                        max: 1,
+
+                        time: 8000,
+
+                        errors: ["time"]
+                    })
+
+                    .catch(() => null);
+
+                // FAIL
+
+                if (
+                    !collected2
+                ) {
+
+                    return interaction.followUp({
+
+                        content:
+                            "🚨 Trop lent.\nBraquage raté.",
+
+                        flags: 64
+                    });
+                }
+
+                const answer2 =
+                    collected2.first().content;
+
+                if (
+                    answer2
+                    !== code
+                ) {
+
+                    return interaction.followUp({
+
+                        content:
+                            "🚨 Mauvais code.\nTu t'es fait arrêter.",
+
+                        flags: 64
+                    });
+                }
+
+                // ======================
+                // PHASE 3
+                // ======================
+
+                const wireColors = [
+
+                    "rouge",
+
+                    "bleu",
+
+                    "vert",
+
+                    "jaune"
+                ];
+
+                const correctWire =
+                    wireColors[
+                        Math.floor(
+                            Math.random()
+                            * wireColors.length
+                        )
+                    ];
+
+                await interaction.followUp({
+
+                    embeds: [
+
+                        new EmbedBuilder()
+
+                        .setColor("DarkRed")
+
+                        .setTitle(
+                            "💣 PHASE 3"
+                        )
+
+                        .setDescription(
+`Quelle couleur couper ?
+
+🟥 rouge
+🟦 bleu
+🟩 vert
+🟨 jaune
+
+Tape :
+\`${correctWire}\`
+
+⏳ 6 secondes`
+                        )
+                    ]
+                });
+
+                const collected3 =
+                    await interaction.channel.awaitMessages({
+
+                        filter,
+
+                        max: 1,
+
+                        time: 6000,
+
+                        errors: ["time"]
+                    })
+
+                    .catch(() => null);
+
+                // FAIL
+
+                if (
+                    !collected3
+                ) {
+
+                    return interaction.followUp({
+
+                        content:
+                            "💥 Bombe explosée.",
+
+                        flags: 64
+                    });
+                }
+
+                const answer3 =
+                    collected3.first().content
+                    .toLowerCase();
+
+                if (
+                    answer3
+                    !== correctWire
+                ) {
+
+                    return interaction.followUp({
+
+                        content:
+                            "💥 Mauvais câble.\nBraquage échoué.",
+
+                        flags: 64
+                    });
+                }
+
+                // ======================
+                // SUCCESS
+                // ======================
+
+                const reward =
+                    Math.floor(
+                        Math.random() * 5000
+                    ) + 2000;
+
+                db.run(
+                    `
+                    UPDATE users
+
+                    SET money = money + ?,
+                    lastRob = ?
+
+                    WHERE userId = ?
+                    `,
+                    [
+                        reward,
+                        now,
+                        userId
+                    ]
+                );
+
+                interaction.followUp({
+
+                    embeds: [
+
+                        new EmbedBuilder()
+
+                        .setColor("Green")
+
+                        .setTitle(
+                            "🏆 BRAQUAGE RÉUSSI"
+                        )
+
+                        .setDescription(
+`💰 Gain :
+${reward}$`
+                        )
+                    ]
+                });
             }
         );
     }
