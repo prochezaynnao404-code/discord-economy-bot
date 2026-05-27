@@ -38,14 +38,14 @@ module.exports = {
                     [interaction.user.id],
                     (err, row) => {
 
-                        const price = 10000000;
+                        const price = 5000000;
 
                         if (
                             row.money < price
                         ) {
 
                             return interaction.reply(
-                                "❌ Il faut 10000000$."
+                                "❌ Il faut 5000000$."
                             );
                         }
 

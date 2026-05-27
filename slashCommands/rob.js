@@ -14,13 +14,14 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        await interaction.deferReply();
-   
-        const db =
-            interaction.client.db;
 
-        const userId =
-            interaction.user.id;
+    await interaction.deferReply();
+
+    const db =
+        interaction.client.db;
+
+    const userId =
+        interaction.user.id;
 
         db.get(
             "SELECT * FROM users WHERE userId = ?",
@@ -30,7 +31,7 @@ module.exports = {
 
                 if (!user) {
 
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         content:
                             "❌ Utilisateur introuvable.",
@@ -67,7 +68,7 @@ module.exports = {
                             timeLeft / 3600000
                         );
 
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         embeds: [
 
@@ -116,7 +117,8 @@ ${hours} heures`
                         )
                     ];
 
-                await interaction.editReply({
+
+                await interaction.followUp({
 
                     embeds: [
 
@@ -391,22 +393,22 @@ Tape :
 
                 interaction.followUp({
 
-                    embeds: [
+    embeds: [
 
-                        new EmbedBuilder()
+        new EmbedBuilder()
 
-                        .setColor("Green")
+        .setColor("Green")
 
-                        .setTitle(
-                            "🏆 BRAQUAGE RÉUSSI"
-                        )
+        .setTitle(
+            "🏆 BRAQUAGE RÉUSSI"
+        )
 
-                        .setDescription(
+        .setDescription(
 `💰 Gain :
 ${reward}$`
-                        )
-                    ]
-                });
+        )
+    ]
+});
             }
         );
     }
