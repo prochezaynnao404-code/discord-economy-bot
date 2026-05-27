@@ -195,7 +195,7 @@ module.exports = {
 ❌ Tu as perdu ${bet}$`
                             );
 
-                        interaction.reply({
+                        interaction.editReply({
                             embeds: [embed]
                         });
                     }

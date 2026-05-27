@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+console.log("🚀 BOT STARTING...");
+
 const fs = require("fs");
 
 const {
@@ -11,6 +13,20 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require("discord.js");
+
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => {
+  res.status(200).send("Bot Discord OK");
+});
+
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, "0.0.0.0", () => {
+    console.log("🌐 LISTEN CALLED");
+  console.log("🌐 Web server ON port:", PORT);
+});
 
 const sqlite3 =
     require("sqlite3").verbose();
@@ -687,20 +703,42 @@ ${bet}$`,
             } else {
 
                 interaction.reply({
-
-                    content:
-                        "❌ Erreur commande.",
-
+                    content: "❌ Erreur commande.",
                     flags: 64
                 });
             }
+
         }
+
     }
 );
 
 // =========================
 // LOGIN
 // =========================
+
+setInterval(() => {
+
+    if (!fs.existsSync("./backups")) {
+
+        fs.mkdirSync("./backups");
+    }
+
+    const date =
+        new Date()
+        .toISOString()
+        .replace(/:/g, "-");
+
+    fs.copyFileSync(
+        "./database.sqlite",
+        `./backups/${date}.sqlite`
+    );
+
+    console.log(
+        "✅ Backup sauvegardé"
+    );
+
+}, 300000);
 
 client.login(
     process.env.TOKEN

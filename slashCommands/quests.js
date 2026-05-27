@@ -14,6 +14,7 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        await interaction.deferReply();
 
         const db =
             interaction.client.db;
@@ -86,7 +87,7 @@ ${row.questProgress}/${row.questGoal}`,
 +${reward}$`
                     );
 
-                interaction.reply({
+                interaction.editReply({
                     embeds: [embed]
                 });
             }
