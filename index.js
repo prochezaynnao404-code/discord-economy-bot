@@ -692,7 +692,7 @@ ${bet}$`,
                 || interaction.deferred
             ) {
 
-                interaction.followUp({
+                interaction.editReply({
 
                     content:
                         "❌ Erreur commande.",
@@ -738,7 +738,7 @@ setInterval(() => {
         "✅ Backup sauvegardé"
     );
 
-}, 300000);
+}, 1800000);
 
 client.login(
     process.env.TOKEN

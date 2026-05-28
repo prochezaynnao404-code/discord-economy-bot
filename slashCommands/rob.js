@@ -68,7 +68,7 @@ module.exports = {
                             timeLeft / 3600000
                         );
 
-                    return interaction.followUp({
+                    return interaction.channel.send({
 
                         embeds: [
 
@@ -118,7 +118,7 @@ ${hours} heures`
                     ];
 
 
-                await interaction.followUp({
+                await interaction.channel.send({
 
                     embeds: [
 
@@ -182,7 +182,7 @@ ${hours} heures`
                     !== randomWord
                 ) {
 
-                    return interaction.followUp({
+                    return interaction.channel.send({
 
                         content:
                             "🚨 Mauvais mot.\nLa police arrive.",
@@ -200,7 +200,7 @@ ${hours} heures`
                         1000 + Math.random() * 9000
                     ).toString();
 
-                await interaction.followUp({
+                await interaction.channel.send({
 
                     embeds: [
 
@@ -242,7 +242,7 @@ ${hours} heures`
                     !collected2
                 ) {
 
-                    return interaction.followUp({
+                    return interaction.channel.send({
 
                         content:
                             "🚨 Trop lent.\nBraquage raté.",
@@ -291,7 +291,7 @@ ${hours} heures`
                         )
                     ];
 
-                await interaction.followUp({
+                await interaction.channel.send({
 
                     embeds: [
 
@@ -339,8 +339,7 @@ Tape :
                     !collected3
                 ) {
 
-                    return interaction.followUp({
-
+                    return interaction.channel.send({
                         content:
                             "💥 Bombe explosée.",
 
@@ -357,7 +356,7 @@ Tape :
                     !== correctWire
                 ) {
 
-                    return interaction.followUp({
+                    return interaction.channel.send({
 
                         content:
                             "💥 Mauvais câble.\nBraquage échoué.",
@@ -391,7 +390,7 @@ Tape :
                     ]
                 );
 
-                interaction.followUp({
+                await interaction.channel.send({
 
     embeds: [
 
