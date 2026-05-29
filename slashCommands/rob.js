@@ -15,11 +15,13 @@ module.exports = {
 
     async execute(interaction) {
 
-    const db =
-        interaction.client.db;
+        await interaction.deferReply();
 
-    const userId =
-        interaction.user.id;
+        const db =
+            interaction.client.db;
+
+        const userId =
+            interaction.user.id;
 
         db.get(
             "SELECT * FROM users WHERE userId = ?",
@@ -29,12 +31,10 @@ module.exports = {
 
                 if (!user) {
 
-                    return interaction.reply({
+                    return interaction.editReply({
 
                         content:
-                            "❌ Utilisateur introuvable.",
-
-                        flags: 64
+                            "❌ Utilisateur introuvable."
                     });
                 }
 
@@ -66,7 +66,7 @@ module.exports = {
                             timeLeft / 3600000
                         );
 
-                    return interaction.reply({
+                    return interaction.editReply({
 
                         embeds: [
 
@@ -82,9 +82,7 @@ module.exports = {
 `⏳ Attends encore
 ${hours} heures`
                             )
-                        ],
-
-                        flags: 64
+                        ]
                     });
                 }
 
@@ -95,15 +93,10 @@ ${hours} heures`
                 const words = [
 
                     "piratage",
-
                     "banque",
-
                     "discret",
-
                     "infiltration",
-
                     "alarme",
-
                     "caméra"
                 ];
 
@@ -115,8 +108,7 @@ ${hours} heures`
                         )
                     ];
 
-
-                await interaction.reply({
+                await interaction.editReply({
 
                     embeds: [
 
@@ -157,18 +149,12 @@ ${hours} heures`
 
                     .catch(() => null);
 
-                // FAIL
+                if (!collected) {
 
-                if (
-                    !collected
-                ) {
-
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         content:
-                            "🚨 Temps écoulé.",
-
-                        flags: 64
+                            "🚨 Temps écoulé."
                     });
                 }
 
@@ -180,12 +166,10 @@ ${hours} heures`
                     !== randomWord
                 ) {
 
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         content:
-                            "🚨 Mauvais mot.\nLa police arrive.",
-
-                        flags: 64
+                            "🚨 Mauvais mot."
                     });
                 }
 
@@ -198,7 +182,7 @@ ${hours} heures`
                         1000 + Math.random() * 9000
                     ).toString();
 
-                await interaction.reply({
+                await interaction.followUp({
 
                     embeds: [
 
@@ -234,18 +218,12 @@ ${hours} heures`
 
                     .catch(() => null);
 
-                // FAIL
+                if (!collected2) {
 
-                if (
-                    !collected2
-                ) {
-
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         content:
-                            "🚨 Trop lent.\nBraquage raté.",
-
-                        flags: 64
+                            "🚨 Trop lent."
                     });
                 }
 
@@ -257,12 +235,10 @@ ${hours} heures`
                     !== code
                 ) {
 
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         content:
-                            "🚨 Mauvais code.\nTu t'es fait arrêter.",
-
-                        flags: 64
+                            "🚨 Mauvais code."
                     });
                 }
 
@@ -273,11 +249,8 @@ ${hours} heures`
                 const wireColors = [
 
                     "rouge",
-
                     "bleu",
-
                     "vert",
-
                     "jaune"
                 ];
 
@@ -289,7 +262,7 @@ ${hours} heures`
                         )
                     ];
 
-                await interaction.reply({
+                await interaction.followUp({
 
                     embeds: [
 
@@ -302,7 +275,7 @@ ${hours} heures`
                         )
 
                         .setDescription(
-`Quelle couleur couper ?
+`Coupe le bon câble :
 
 🟥 rouge
 🟦 bleu
@@ -331,17 +304,12 @@ Tape :
 
                     .catch(() => null);
 
-                // FAIL
+                if (!collected3) {
 
-                if (
-                    !collected3
-                ) {
+                    return interaction.followUp({
 
-                    return interaction.reply({
                         content:
-                            "💥 Bombe explosée.",
-
-                        flags: 64
+                            "💥 Bombe explosée."
                     });
                 }
 
@@ -354,12 +322,10 @@ Tape :
                     !== correctWire
                 ) {
 
-                    return interaction.reply({
+                    return interaction.followUp({
 
                         content:
-                            "💥 Mauvais câble.\nBraquage échoué.",
-
-                        flags: 64
+                            "💥 Mauvais câble."
                     });
                 }
 
@@ -369,8 +335,8 @@ Tape :
 
                 const reward =
                     Math.floor(
-                        Math.random() * 15000
-                    ) + 5000;
+                        Math.random() * 25000
+                    ) + 7000;
 
                 db.run(
                     `
@@ -388,24 +354,24 @@ Tape :
                     ]
                 );
 
-                await interaction.reply({
+                return interaction.followUp({
 
-    embeds: [
+                    embeds: [
 
-        new EmbedBuilder()
+                        new EmbedBuilder()
 
-        .setColor("Green")
+                        .setColor("Green")
 
-        .setTitle(
-            "🏆 BRAQUAGE RÉUSSI"
-        )
+                        .setTitle(
+                            "🏆 BRAQUAGE RÉUSSI"
+                        )
 
-        .setDescription(
+                        .setDescription(
 `💰 Gain :
 ${reward}$`
-        )
-    ]
-});
+                        )
+                    ]
+                });
             }
         );
     }
