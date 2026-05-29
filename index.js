@@ -60,7 +60,7 @@ client.commands =
 
 const db =
     new sqlite3.Database(
-        "./database.sqlite"
+        "database.sqlite"
     );
 
 client.db = db;
@@ -163,9 +163,7 @@ ${file}`
 
 client.once(
     Events.ClientReady,
-
     () => {
-
         console.log(
             `✅ Connecté :
 ${client.user.tag}`
@@ -241,9 +239,18 @@ client.on(
 
                     level++;
 
-                    message.channel.send(
-`⭐ ${message.author.username}
-est passé niveau ${level}`
+                    try {
+
+                message.channel.send(
+               `⭐ ${message.author.username}
+               est passé niveau ${level}`
+                   );
+
+               } catch (err) {
+
+                   console.log(
+                        "Impossible d'envoyer le message niveau"
+    
                     );
                 }
 
@@ -271,9 +278,17 @@ est passé niveau ${level}`
 
                         completed = 1;
 
-                        message.channel.send(
-`🎯 ${message.author}
-a terminé sa quête messages`
+                        try {
+
+                            message.channel.send(
+                        `🎯 ${message.author}
+                        a terminé sa quête messages`
+                            );
+
+                        } catch (err) {
+
+                            console.log(
+                                 "Impossible d'envoyer le message quête"
                         );
                     }
                 }
@@ -687,30 +702,38 @@ ${bet}$`,
 
             console.log(error);
 
-            if (
-                interaction.replied
-                || interaction.deferred
-            ) {
+            try {
 
-                await interaction.reply({
+                if (
+                    interaction.replied
+                    || interaction.deferred
+                ) {
 
-                    content:
-                        "❌ Erreur commande.",
+                    await interaction.editReply({
 
-                    flags: 64
-                });
-            } else {
-                await interaction.reply({
-                    content:
-                        "❌ Erreur commande.",
-                    flags: 64
-                });
+                        content:
+                            "❌ Erreur commande."
+
+                    });
+
+                } else {
+
+                    await interaction.reply({
+
+                        content:
+                            "❌ Erreur commande.",
+
+                        flags: 64
+                    });
+                }
+
+            } catch (e) {
+
+                console.log(
+                    "❌ Impossible de répondre à l'interaction"
+                );
             }
-
-        }
-
-    }
-);
+        });
 
 // =========================
 // LOGIN
@@ -729,9 +752,9 @@ setInterval(() => {
         .replace(/:/g, "-");
 
     fs.copyFileSync(
-        "./database.sqlite",
-        `./backups/${date}.sqlite`
-    );
+    "/opt/render/project/src/data/database.sqlite",
+    `./backups/${date}.sqlite`
+);
 
     console.log(
         "✅ Backup sauvegardé"
