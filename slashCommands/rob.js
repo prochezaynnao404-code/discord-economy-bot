@@ -165,7 +165,7 @@ ${hours} heures`
                     !collected
                 ) {
 
-                    return interaction.followUp({
+                    return interaction.editReply({
 
                         content:
                             "🚨 Temps écoulé.",

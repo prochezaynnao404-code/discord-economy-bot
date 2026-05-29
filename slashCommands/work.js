@@ -115,7 +115,7 @@ ${job.word}
 ⏳ 10 secondes`
             );
 
-        await interaction.editReply({
+        await interaction.followUp({
             embeds: [embed]
         });
 

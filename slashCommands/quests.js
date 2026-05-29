@@ -87,7 +87,7 @@ ${row.questProgress}/${row.questGoal}`,
 +${reward}$`
                     );
 
-                await interaction.editReply({
+                await interaction.followUp({
                     embeds: [embed]
                 });
             }

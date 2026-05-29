@@ -40,10 +40,7 @@ module.exports = {
                     );
 
                     return interaction.editReply({
-
-                        content:
-                            "Réessaie la commande.",
-
+                        content: "Réessaie la commande.",
                         flags: 64
                     });
                 }
@@ -83,23 +80,12 @@ module.exports = {
                         );
 
                     return interaction.editReply({
-
                         embeds: [
-
                             new EmbedBuilder()
-
-                            .setColor("Red")
-
-                            .setTitle(
-                                "⏳ DAILY"
-                            )
-
-                            .setDescription(
-`Reviens dans
-${hours}h ${minutes}m`
-                            )
+                                .setColor("Red")
+                                .setTitle("⏳ DAILY")
+                                .setDescription(`Reviens dans\n${hours}h ${minutes}m`)
                         ],
-
                         flags: 64
                     });
                 }
@@ -148,24 +134,11 @@ ${hours}h ${minutes}m`
                 );
 
                 await interaction.editReply({
-
                     embeds: [
-
                         new EmbedBuilder()
-
-                        .setColor("Green")
-
-                        .setTitle(
-                            "🎁 DAILY"
-                        )
-
-                        .setDescription(
-`💰 Gain :
-${reward}$
-
-🔥 Série :
-${streak}/10`
-                        )
+                            .setColor("Green")
+                            .setTitle("🎁 DAILY")
+                            .setDescription(`💰 Gain :\n${reward}$\n\n🔥 Série :\n${streak}/10`)
                     ]
                 });
             }

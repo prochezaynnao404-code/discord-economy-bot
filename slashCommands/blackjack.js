@@ -86,7 +86,7 @@ module.exports = {
                             row.money < bet
                         ) {
 
-                            return interaction.editReply({
+                            return interaction.followUp({
 
                                 content:
                                     "❌ Pas assez d'argent.",
@@ -162,7 +162,7 @@ module.exports = {
 +${bet}$`
                                 );
 
-                            return interaction.editReply({
+                            return interaction.followUp({
                                 embeds: [embed]
                             });
                         }
