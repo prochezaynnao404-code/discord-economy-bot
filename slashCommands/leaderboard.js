@@ -39,7 +39,7 @@ module.exports = {
                         [userId]
                     );
 
-                    return interaction.reply({
+                    return interaction.editReply({
 
                         content:
                             "Réessaie la commande.",
@@ -82,7 +82,7 @@ module.exports = {
                             ) / 60000
                         );
 
-                    return interaction.reply({
+                    return interaction.editReply({
 
                         embeds: [
 
@@ -147,7 +147,7 @@ ${hours}h ${minutes}m`
                     ]
                 );
 
-                interaction.reply({
+                await interaction.editReply({
 
                     embeds: [
 

@@ -71,7 +71,7 @@ module.exports = {
                         / 60000
                     );
 
-                return interaction.reply({
+                return interaction.editReply({
 
                     content:
 `⏳ Tu dois attendre ${remaining} minutes.`,
@@ -115,7 +115,7 @@ ${job.word}
 ⏳ 10 secondes`
             );
 
-        await interaction.reply({
+        await interaction.editReply({
             embeds: [embed]
         });
 

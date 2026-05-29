@@ -35,7 +35,7 @@ module.exports = {
                     row.questCompleted !== 1
                 ) {
 
-                    return interaction.reply({
+                    return interaction.editReply({
 
                         content:
 `❌ Quête non terminée
@@ -87,7 +87,7 @@ ${row.questProgress}/${row.questGoal}`,
 +${reward}$`
                     );
 
-                interaction.editReply({
+                await interaction.editReply({
                     embeds: [embed]
                 });
             }

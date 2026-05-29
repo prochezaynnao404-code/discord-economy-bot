@@ -55,7 +55,7 @@ module.exports = {
 
         if (bet <= 0) {
 
-            return interaction.reply({
+            return interaction.editReply({
 
                 content:
                     "❌ Mise invalide.",
@@ -86,7 +86,7 @@ module.exports = {
                             row.money < bet
                         ) {
 
-                            return interaction.reply({
+                            return interaction.editReply({
 
                                 content:
                                     "❌ Pas assez d'argent.",
@@ -162,7 +162,7 @@ module.exports = {
 +${bet}$`
                                 );
 
-                            return interaction.reply({
+                            return interaction.editReply({
                                 embeds: [embed]
                             });
                         }
@@ -228,7 +228,7 @@ module.exports = {
 ${bet}$`
                             );
 
-                        interaction.reply({
+                        await interaction.editReply({
 
                             embeds: [embed],
 
