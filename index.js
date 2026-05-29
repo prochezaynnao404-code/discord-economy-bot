@@ -183,30 +183,22 @@ client.on(
 
     async message => {
 
-        if (
-            message.author.bot
-        ) return;
+        if (message.author.bot) return;
 
         const userId =
             message.author.id;
 
         createUser(userId);
 
-        // ANTI SPAM
-
         if (
             messageCooldown.has(userId)
         ) return;
 
-        messageCooldown.add(
-            userId
-        );
+        messageCooldown.add(userId);
 
         setTimeout(() => {
 
-            messageCooldown.delete(
-                userId
-            );
+            messageCooldown.delete(userId);
 
         }, 30000);
 
@@ -229,8 +221,6 @@ client.on(
                 let level =
                     row.level;
 
-                // LEVEL UP
-
                 if (
                     xp >= level * 100
                 ) {
@@ -241,20 +231,13 @@ client.on(
 
                     try {
 
-                message.channel.send(
-               `⭐ ${message.author.username}
-               est passé niveau ${level}`
-                   );
+                        message.channel.send(
+`⭐ ${message.author.username}
+est passé niveau ${level}`
+                        );
 
-               } catch (err) {
-
-                   console.log(
-                        "Impossible d'envoyer le message niveau"
-    
-                    );
+                    } catch (err) {}
                 }
-
-                // QUESTS
 
                 let progress =
                     row.questProgress;
@@ -281,15 +264,11 @@ client.on(
                         try {
 
                             message.channel.send(
-                        `🎯 ${message.author}
-                        a terminé sa quête messages`
+`🎯 ${message.author}
+a terminé sa quête messages`
                             );
 
-                        } catch (err) {
-
-                            console.log(
-                                 "Impossible d'envoyer le message quête"
-                        );
+                        } catch (err) {}
                     }
                 }
 
@@ -314,10 +293,10 @@ client.on(
                         userId
                     ]
                 );
-            } 
-        ); 
-    } 
-); 
+            }
+        );
+    }
+);
 
 // =========================
 // VOCAL MONEY
@@ -698,34 +677,36 @@ ${bet}$`,
                 interaction
             );
 
-        } catch (error) {
+                } catch (error) {
 
-    console.log(error);
+            console.log(error);
 
-    if (
-        interaction.replied
-        || interaction.deferred
-    ) {
+            if (
+                interaction.replied
+                || interaction.deferred
+            ) {
 
-        await interaction.followUp({
+                await interaction.followUp({
 
-            content:
-                "❌ Erreur commande.",
+                    content:
+                        "❌ Erreur commande.",
 
-            flags: 64
-        });
+                    flags: 64
+                });
 
-    } else {
+            } else {
 
-        await interaction.reply({
+                await interaction.reply({
 
-            content:
-                "❌ Erreur commande.",
+                    content:
+                        "❌ Erreur commande.",
 
-            flags: 64
-        });
+                    flags: 64
+                });
+            }
+        }
     }
-}
+);
 
 // =========================
 // LOGIN
@@ -744,9 +725,9 @@ setInterval(() => {
         .replace(/:/g, "-");
 
     fs.copyFileSync(
-    "/opt/render/project/src/data/database.sqlite",
-    `./backups/${date}.sqlite`
-);
+        "/data/database.sqlite",
+        `./backups/${date}.sqlite`
+    );
 
     console.log(
         "✅ Backup sauvegardé"
@@ -756,5 +737,4 @@ setInterval(() => {
 
 client.login(
     process.env.TOKEN
-    }    
 );
