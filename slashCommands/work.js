@@ -75,7 +75,7 @@ module.exports = {
                     content:
 `⏳ Tu dois attendre ${remaining} minutes.`,
 
-                    meral: true
+                    flags: 64
                 });
             }
         }
@@ -114,7 +114,7 @@ ${job.word}
 ⏳ 10 secondes`
             );
 
-        await interaction.followUp({
+        await interaction.reply({
             embeds: [embed]
         });
 

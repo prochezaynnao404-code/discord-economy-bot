@@ -133,13 +133,14 @@ module.exports = {
                     ]
                 );
 
-                await interaction.reply({
+                 interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("Green")
                             .setTitle("🎁 DAILY")
                             .setDescription(`💰 Gain :\n${reward}$\n\n🔥 Série :\n${streak}/10`)
-                    ]
+                    ],
+                    flags: 64
                 });
             }
         );

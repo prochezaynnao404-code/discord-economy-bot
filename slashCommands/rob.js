@@ -29,7 +29,7 @@ module.exports = {
 
                 if (!user) {
 
-                    return interaction.followUp({
+                    return interaction.reply({
 
                         content:
                             "❌ Utilisateur introuvable.",
@@ -66,7 +66,7 @@ module.exports = {
                             timeLeft / 3600000
                         );
 
-                    return interaction.channel.send({
+                    return interaction.reply({
 
                         embeds: [
 
@@ -116,7 +116,7 @@ ${hours} heures`
                     ];
 
 
-                await interaction.channel.send({
+                await interaction.reply({
 
                     embeds: [
 
@@ -180,7 +180,7 @@ ${hours} heures`
                     !== randomWord
                 ) {
 
-                    return interaction.channel.send({
+                    return interaction.reply({
 
                         content:
                             "🚨 Mauvais mot.\nLa police arrive.",
@@ -198,7 +198,7 @@ ${hours} heures`
                         1000 + Math.random() * 9000
                     ).toString();
 
-                await interaction.channel.send({
+                await interaction.reply({
 
                     embeds: [
 
@@ -240,7 +240,7 @@ ${hours} heures`
                     !collected2
                 ) {
 
-                    return interaction.channel.send({
+                    return interaction.reply({
 
                         content:
                             "🚨 Trop lent.\nBraquage raté.",
@@ -257,7 +257,7 @@ ${hours} heures`
                     !== code
                 ) {
 
-                    return interaction.followUp({
+                    return interaction.reply({
 
                         content:
                             "🚨 Mauvais code.\nTu t'es fait arrêter.",
@@ -289,7 +289,7 @@ ${hours} heures`
                         )
                     ];
 
-                await interaction.channel.send({
+                await interaction.reply({
 
                     embeds: [
 
@@ -337,7 +337,7 @@ Tape :
                     !collected3
                 ) {
 
-                    return interaction.channel.send({
+                    return interaction.reply({
                         content:
                             "💥 Bombe explosée.",
 
@@ -354,7 +354,7 @@ Tape :
                     !== correctWire
                 ) {
 
-                    return interaction.channel.send({
+                    return interaction.reply({
 
                         content:
                             "💥 Mauvais câble.\nBraquage échoué.",
@@ -388,7 +388,7 @@ Tape :
                     ]
                 );
 
-                await interaction.channel.send({
+                await interaction.reply({
 
     embeds: [
 

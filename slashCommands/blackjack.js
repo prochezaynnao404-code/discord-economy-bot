@@ -161,7 +161,7 @@ module.exports = {
 +${bet}$`
                                 );
 
-                            return interaction.followUp({
+                            return interaction.reply({
                                 embeds: [embed]
                             });
                         }
@@ -227,7 +227,7 @@ module.exports = {
 ${bet}$`
                             );
 
-                        await interaction.reply({
+                         interaction.reply({
 
                             embeds: [embed],
 
