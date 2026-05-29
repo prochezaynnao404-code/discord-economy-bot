@@ -700,40 +700,32 @@ ${bet}$`,
 
         } catch (error) {
 
-            console.log(error);
+    console.log(error);
 
-            try {
+    if (
+        interaction.replied
+        || interaction.deferred
+    ) {
 
-                if (
-                    interaction.replied
-                    || interaction.deferred
-                ) {
+        await interaction.followUp({
 
-                    await interaction.editReply({
+            content:
+                "❌ Erreur commande.",
 
-                        content:
-                            "❌ Erreur commande."
-
-                    });
-
-                } else {
-
-                    await interaction.reply({
-
-                        content:
-                            "❌ Erreur commande.",
-
-                        flags: 64
-                    });
-                }
-
-            } catch (e) {
-
-                console.log(
-                    "❌ Impossible de répondre à l'interaction"
-                );
-            }
+            flags: 64
         });
+
+    } else {
+
+        await interaction.reply({
+
+            content:
+                "❌ Erreur commande.",
+
+            flags: 64
+        });
+    }
+}
 
 // =========================
 // LOGIN
@@ -764,4 +756,5 @@ setInterval(() => {
 
 client.login(
     process.env.TOKEN
+    }    
 );
