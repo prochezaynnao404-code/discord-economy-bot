@@ -40,7 +40,6 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        await interaction.deferReply();
 
         const userId =
             interaction.user.id;
@@ -71,7 +70,7 @@ module.exports = {
                         / 60000
                     );
 
-                return interaction.editReply({
+                return interaction.reply({
 
                     content:
 `⏳ Tu dois attendre ${remaining} minutes.`,

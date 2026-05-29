@@ -39,7 +39,7 @@ module.exports = {
                         [userId]
                     );
 
-                    return interaction.editReply({
+                    return interaction.reply({
                         content: "Réessaie la commande.",
                         flags: 64
                     });
@@ -79,7 +79,7 @@ module.exports = {
                             ) / 60000
                         );
 
-                    return interaction.editReply({
+                    return interaction.reply({
                         embeds: [
                             new EmbedBuilder()
                                 .setColor("Red")
@@ -133,7 +133,7 @@ module.exports = {
                     ]
                 );
 
-                await interaction.editReply({
+                await interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setColor("Green")

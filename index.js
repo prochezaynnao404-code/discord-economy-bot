@@ -692,7 +692,7 @@ ${bet}$`,
                 || interaction.deferred
             ) {
 
-                await interaction.editReply({
+                await interaction.reply({
 
                     content:
                         "❌ Erreur commande.",
@@ -700,7 +700,7 @@ ${bet}$`,
                     flags: 64
                 });
             } else {
-                await interaction.editReply({
+                await interaction.reply({
                     content:
                         "❌ Erreur commande.",
                     flags: 64

@@ -14,8 +14,7 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        await interaction.deferReply();
-
+        
         const db =
             interaction.client.db;
 
@@ -35,7 +34,7 @@ module.exports = {
                     row.questCompleted !== 1
                 ) {
 
-                    return interaction.editReply({
+                    return interaction.reply({
 
                         content:
 `❌ Quête non terminée

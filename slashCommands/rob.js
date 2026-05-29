@@ -15,8 +15,6 @@ module.exports = {
 
     async execute(interaction) {
 
-    await interaction.deferReply();
-
     const db =
         interaction.client.db;
 
@@ -165,7 +163,7 @@ ${hours} heures`
                     !collected
                 ) {
 
-                    return interaction.editReply({
+                    return interaction.reply({
 
                         content:
                             "🚨 Temps écoulé.",

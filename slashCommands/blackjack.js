@@ -39,7 +39,6 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        await interaction.deferReply();
 
         const db =
             interaction.client.db;
@@ -55,7 +54,7 @@ module.exports = {
 
         if (bet <= 0) {
 
-            return interaction.editReply({
+            return interaction.reply({
 
                 content:
                     "❌ Mise invalide.",
@@ -86,7 +85,7 @@ module.exports = {
                             row.money < bet
                         ) {
 
-                            return interaction.followUp({
+                            return interaction.reply({
 
                                 content:
                                     "❌ Pas assez d'argent.",
@@ -228,7 +227,7 @@ module.exports = {
 ${bet}$`
                             );
 
-                        await interaction.editReply({
+                        await interaction.reply({
 
                             embeds: [embed],
 
