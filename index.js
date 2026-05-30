@@ -735,6 +735,9 @@ setInterval(() => {
 
 }, 1800000);
 
+console.log("TOKEN PRESENT =", !!process.env.TOKEN);
+console.log("TOKEN LENGTH =", process.env.TOKEN?.length);
+
 client.login(
     process.env.TOKEN
 );
