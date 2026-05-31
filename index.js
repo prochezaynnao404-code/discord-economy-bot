@@ -709,22 +709,57 @@ ${bet}$`,
 );
 
 // =========================
-// LOGIN
+// BACKUPS SQLITE
 // =========================
 
 setInterval(() => {
 
-    if (fs.existsSync("./database.sqlite")) {
+    try {
 
-    fs.copyFileSync(
-        "./database.sqlite",
-        `./backups/${date}.sqlite`
-    );
+        if (!fs.existsSync("./database.sqlite")) {
 
-    console.log("✅ Backup sauvegardé");
-}
+            console.log("⚠️ database.sqlite introuvable");
+            return;
+        }
 
-}, 1800000);
+        if (!fs.existsSync("./backups")) {
+
+            fs.mkdirSync("./backups");
+        }
+
+        const date = new Date()
+            .toISOString()
+            .replace(/:/g, "-");
+
+        fs.copyFileSync(
+            "./database.sqlite",
+            `./backups/${date}.sqlite`
+        );
+
+        console.log("✅ Backup sauvegardé");
+
+    } catch (err) {
+
+        console.error(
+            "❌ Erreur backup :",
+            err
+        );
+    }
+
+}, 1800000); // toutes les 30 minutes
+
+const db = new sqlite3.Database(
+    "./database.sqlite"
+);
+
+console.log(
+    "📁 Database :",
+    fs.existsSync("./database.sqlite")
+);
+
+// =========================
+// LOGIN
+// =========================
 
 console.log("TOKEN PRESENT =", !!process.env.TOKEN);
 console.log("TOKEN LENGTH =", process.env.TOKEN?.length);
