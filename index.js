@@ -714,24 +714,15 @@ ${bet}$`,
 
 setInterval(() => {
 
-    if (!fs.existsSync("./backups")) {
-
-        fs.mkdirSync("./backups");
-    }
-
-    const date =
-        new Date()
-        .toISOString()
-        .replace(/:/g, "-");
+    if (fs.existsSync("./database.sqlite")) {
 
     fs.copyFileSync(
-        "/data/database.sqlite",
+        "./database.sqlite",
         `./backups/${date}.sqlite`
     );
 
-    console.log(
-        "✅ Backup sauvegardé"
-    );
+    console.log("✅ Backup sauvegardé");
+}
 
 }, 1800000);
 
