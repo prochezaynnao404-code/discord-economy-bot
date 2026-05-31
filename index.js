@@ -748,10 +748,6 @@ setInterval(() => {
 
 }, 1800000); // toutes les 30 minutes
 
-const db = new sqlite3.Database(
-    "./database.sqlite"
-);
-
 console.log(
     "📁 Database :",
     fs.existsSync("./database.sqlite")
