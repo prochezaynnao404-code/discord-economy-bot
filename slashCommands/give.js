@@ -1,18 +1,16 @@
 const {
-    SlashCommandBuilder,
-    EmbedBuilder
+    SlashCommandBuilder
 } = require("discord.js");
 
-const OWNER_ID = process.env.OWNER_ID;
-
 module.exports = {
+
     data: new SlashCommandBuilder()
         .setName("give")
-        .setDescription("Donne de l'argent à un joueur")
+        .setDescription("Donner de l'argent")
         .addUserOption(option =>
             option
-                .setName("joueur")
-                .setDescription("Le joueur")
+                .setName("user")
+                .setDescription("Utilisateur")
                 .setRequired(true)
         )
         .addIntegerOption(option =>
@@ -24,57 +22,44 @@ module.exports = {
 
     async execute(interaction) {
 
-        if (interaction.user.id !== OWNER_ID) {
+        // Remplace par ton ID Discord
+        const OWNER_ID = "1184567704133324891";
+
+        if (
+            interaction.user.id !== OWNER_ID
+        ) {
             return interaction.reply({
-                content: "❌ Accès refusé.",
+                content:
+                    "❌ Seul le propriétaire du bot peut utiliser cette commande.",
                 flags: 64
             });
         }
 
-        const target =
-            interaction.options.getUser("joueur");
+        const user =
+            interaction.options.getUser(
+                "user"
+            );
 
-        const amount =
-            interaction.options.getInteger("montant");
+        const montant =
+            interaction.options.getInteger(
+                "montant"
+            );
 
         const db =
             interaction.client.db;
 
         db.run(
-            `
-            INSERT OR IGNORE INTO users(userId)
-            VALUES(?)
-            `,
-            [target.id]
+            `UPDATE users
+             SET money = money + ?
+             WHERE userId = ?`,
+            [
+                montant,
+                user.id
+            ]
         );
 
-        db.run(
-            `
-            UPDATE users
-            SET money = money + ?
-            WHERE userId = ?
-            `,
-            [amount, target.id],
-            err => {
-
-                if (err) {
-                    return interaction.reply({
-                        content: "❌ Erreur.",
-                        flags: 64
-                    });
-                }
-
-                interaction.reply({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor("Green")
-                            .setTitle("💸 GIVE")
-                            .setDescription(
-                                `${target} a reçu **${amount}$**`
-                            )
-                    ]
-                });
-            }
+        await interaction.reply(
+            `✅ ${montant}$ ajoutés à ${user.tag}`
         );
     }
 };
