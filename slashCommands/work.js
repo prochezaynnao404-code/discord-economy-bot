@@ -49,7 +49,7 @@ module.exports = {
         // =====================
 
         const cooldown =
-            30 * 60 * 1000;
+            60 * 60 * 1000;
 
         if (
             cooldowns.has(userId)

@@ -42,7 +42,7 @@ module.exports = {
                     Date.now();
 
                 const cooldown =
-                    172800000;
+                    86400000;
 
                 // ======================
                 // COOLDOWN
