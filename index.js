@@ -58,10 +58,11 @@ client.commands =
 // DATABASE
 // =========================
 
-const db =
-    new sqlite3.Database(
-        "database.sqlite"
-    );
+console.log("Database path:", "/data/database.sqlite");
+
+const db = new sqlite3.Database(
+    "/data/database.sqlite"
+);
 
 client.db = db;
 
@@ -716,15 +717,16 @@ setInterval(() => {
 
     try {
 
-        if (!fs.existsSync("./database.sqlite")) {
+        const dbPath = "/data/database.sqlite";
+        const backupDir = "/data/backups";
 
+        if (!fs.existsSync(dbPath)) {
             console.log("⚠️ database.sqlite introuvable");
             return;
         }
 
-        if (!fs.existsSync("./backups")) {
-
-            fs.mkdirSync("./backups");
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
         }
 
         const date = new Date()
@@ -732,8 +734,8 @@ setInterval(() => {
             .replace(/:/g, "-");
 
         fs.copyFileSync(
-            "./database.sqlite",
-            `./backups/${date}.sqlite`
+            dbPath,
+            `${backupDir}/${date}.sqlite`
         );
 
         console.log("✅ Backup sauvegardé");
@@ -744,14 +746,10 @@ setInterval(() => {
             "❌ Erreur backup :",
             err
         );
+
     }
 
-}, 1800000); // toutes les 30 minutes
-
-console.log(
-    "📁 Database :",
-    fs.existsSync("./database.sqlite")
-);
+}, 1800000);
 
 // =========================
 // LOGIN
