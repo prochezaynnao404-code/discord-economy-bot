@@ -153,9 +153,11 @@ ${file}`
     }
 
     client.commands.set(
-        command.data.name,
-        command
-    );
+    command.data.name,
+    command
+);
+
+console.log("✅ Commande chargée :", command.data.name);
 }
 
 // =========================
