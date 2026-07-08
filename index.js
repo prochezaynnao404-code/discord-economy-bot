@@ -304,8 +304,7 @@ client.on(
                     try {
 
                         message.channel.send(
-`⭐ ${message.author.username}
-est passé niveau ${level}`
+`⭐ ${message.author.username} est passé niveau ${level}`
                         );
 
                     } catch (err) {}

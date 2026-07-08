@@ -61,6 +61,15 @@ module.exports = {
                     });
 
                 }
+                
+                db.all(
+                   "SELECT userId FROM users ORDER BY level DESC, xp DESC",
+                    async (err, rows) => {
+
+                        const rank =
+                            rows.findIndex(
+                                u => u.userId === user.id
+                            ) + 1;
 
                 const canvas =
                     createCanvas(1000, 500);
@@ -69,8 +78,25 @@ module.exports = {
                     canvas.getContext("2d");
 
                 // Fond
-                ctx.fillStyle = "#15171c";
+                let color = "#4CAF50";
+
+                if (data.level >= 10)
+                    color = "#3498db";
+
+                if (data.level >= 20)
+                    color = "#9b59b6";
+
+                if (data.level >= 35)
+                    color = "#f39c12";
+
+                if (data.level >= 50)
+                    color = "#e74c3c";
+
+                ctx.fillStyle = color;
                 ctx.fillRect(0, 0, 1000, 500);
+
+                ctx.fillStyle = "#1b1b1b";
+                ctx.fillRect(15, 15, 970, 470);
 
                 // Avatar
                 const avatar = await loadImage(
@@ -80,6 +106,19 @@ module.exports = {
                         size: 512
                     })
                 );
+                
+                ctx.beginPath();
+
+                ctx.arc(
+                    130,
+                    130,
+                    78,
+                    0,
+                Math.PI * 2
+                );
+
+                ctx.fillStyle = color;
+                ctx.fill();
 
                 ctx.save();
 
@@ -131,6 +170,42 @@ module.exports = {
 
                     160
 
+                );
+                
+                const maxXP = data.level * 100;
+
+                const percent =
+                      Math.min(
+                          data.xp / maxXP,
+                          1
+                      );
+
+                ctx.fillStyle = "#444";
+
+                ctx.fillRect(
+                    240,
+                    180,
+                    500,
+                    24
+                );
+
+                ctx.fillStyle = color;
+
+                ctx.fillRect(
+                    240,
+                    180,
+                    500 * percent,
+                    24
+                );
+
+                ctx.fillStyle = "white";
+
+                ctx.font = "18px Arial";
+
+                ctx.fillText(
+                   `${data.xp}/${maxXP} XP`,
+                   250,
+                   198
                 );
 
                 ctx.fillText(
@@ -194,6 +269,33 @@ module.exports = {
 
                     430
 
+                );
+                
+                ctx.font = "28px Arial";
+
+                ctx.fillStyle = "white";
+
+                ctx.fillText(
+                    `🏆 Rang : #${rank}`,
+                    700,
+                    120
+                );
+
+                ctx.fillText(
+                    `🔥 Daily : ${data.dailyStreak}/10`,
+                    700,
+                    170
+                );
+
+                const days =
+                    Math.floor(
+                        (Date.now() - member.joinedTimestamp) / 86400000
+                    );
+
+                ctx.fillText(
+                    `📅 Depuis ${days} jours`,
+                    700,
+                    220
                 );
 
                 const attachment =
