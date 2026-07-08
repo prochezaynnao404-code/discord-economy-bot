@@ -15,13 +15,14 @@ const commandFiles =
 
 for (const file of commandFiles) {
 
-    const command =
-        require(`./slashCommands/${file}`);
+    const command = require(`./slashCommands/${file}`);
 
-    commands.push(
-        command.data.toJSON()
-    );
+    console.log("Chargement :", command.data.name);
+
+    commands.push(command.data.toJSON());
 }
+
+console.log(commands.map(c => c.name));
 
 const rest = new REST({
     version: "10"

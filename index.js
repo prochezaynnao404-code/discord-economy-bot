@@ -31,6 +31,13 @@ app.listen(PORT, "0.0.0.0", () => {
 const sqlite3 =
     require("sqlite3").verbose();
 
+const {
+    createCanvas,
+    loadImage
+} = require("@napi-rs/canvas");
+
+const path = require("path");
+
 // =========================
 // CLIENT
 // =========================
@@ -77,6 +84,10 @@ CREATE TABLE IF NOT EXISTS users (
 
     money INTEGER DEFAULT 0,
 
+    messages INTEGER DEFAULT 0,
+
+    voiceTime INTEGER DEFAULT 0,
+
     bank INTEGER DEFAULT 0,
 
     xp INTEGER DEFAULT 0,
@@ -101,7 +112,9 @@ CREATE TABLE IF NOT EXISTS users (
 
     lastRob INTEGER DEFAULT 0,
 
-    lastWork INTEGER DEFAULT 0
+    lastWork INTEGER DEFAULT 0,
+
+    joinedAt INTEGER DEFAULT 0
 )
 `);
 
@@ -173,6 +186,26 @@ ${client.user.tag}`
         );
     }
 );
+
+// =========================
+// NOUVEAU MEMBRE
+// =========================
+
+client.on("guildMemberAdd", member => {
+
+    db.run(
+        `INSERT OR IGNORE INTO users (
+            userId,
+            joinedAt
+        )
+        VALUES (?, ?)`,
+        [
+             member.id,
+            Date.now()
+        ]
+    );
+
+});
 
 // =========================
 // MESSAGE MONEY + XP
@@ -282,6 +315,7 @@ a terminé sa quête messages`
                     SET money = money + ?,
                     xp = ?,
                     level = ?,
+                    messages = messages + 1,
                     questProgress = ?,
                     questCompleted = ?
 
@@ -371,6 +405,7 @@ setInterval(() => {
 
                                 SET money = money + ?,
                                 xp = xp + 10,
+                                voiceTime = voiceTime + 600,
                                 questProgress = ?,
                                 questCompleted = ?
 
@@ -752,6 +787,41 @@ setInterval(() => {
     }
 
 }, 1800000);
+
+// =========================
+// VOICE TIME
+// =========================
+
+const voiceJoin = new Map();
+
+client.on("voiceStateUpdate", (oldState, newState) => {
+
+    const userId = newState.id;
+
+    if (!oldState.channel && newState.channel) {
+
+        voiceJoin.set(userId, Date.now());
+
+    }
+
+    if (oldState.channel && !newState.channel) {
+
+        if (!voiceJoin.has(userId)) return;
+
+        const duration = Math.floor(
+            (Date.now() - voiceJoin.get(userId)) / 1000
+        );
+
+        voiceJoin.delete(userId);
+
+        client.db.run(
+            `UPDATE users
+            SET voiceTime = voiceTime + ?
+            WHERE userId = ?`,
+            [duration, userId]
+        );
+    }
+});
 
 // =========================
 // LOGIN
