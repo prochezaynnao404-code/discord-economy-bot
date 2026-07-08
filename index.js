@@ -72,6 +72,7 @@ const db = new sqlite3.Database(
 );
 
 client.db = db;
+const voiceSessions = new Map();
 
 // =========================
 // CREATE TABLE
@@ -864,6 +865,83 @@ client.on("voiceStateUpdate", (oldState, newState) => {
 
 console.log("TOKEN PRESENT =", !!process.env.TOKEN);
 console.log("TOKEN LENGTH =", process.env.TOKEN?.length);
+
+setInterval(() => {
+
+    const now = Date.now();
+
+    for (const [userId, start] of voiceSessions) {
+
+        const seconds =
+            Math.floor(
+                (now - start) / 1000
+            );
+
+        if (seconds <= 0) continue;
+
+        db.run(
+            `UPDATE users
+             SET voiceTime = voiceTime + ?
+             WHERE userId = ?`,
+            [
+                seconds,
+                userId
+            ]
+        );
+
+        voiceSessions.set(
+            userId,
+            now
+        );
+
+    }
+
+}, 60000);
+
+client.on("voiceStateUpdate", (oldState, newState) => {
+
+    const userId = newState.id;
+
+    if (newState.member.user.bot) return;
+
+    // rejoint un vocal
+    if (!oldState.channelId && newState.channelId) {
+
+        voiceSessions.set(
+            userId,
+            Date.now()
+        );
+
+    }
+
+    // quitte le vocal
+    if (oldState.channelId && !newState.channelId) {
+
+        const start =
+            voiceSessions.get(userId);
+
+        if (!start) return;
+
+        const seconds =
+            Math.floor(
+                (Date.now() - start) / 1000
+            );
+
+        db.run(
+            `UPDATE users
+             SET voiceTime = voiceTime + ?
+             WHERE userId = ?`,
+            [
+                seconds,
+                userId
+            ]
+        );
+
+        voiceSessions.delete(userId);
+
+    }
+
+});
 
 client.login(
     process.env.TOKEN
