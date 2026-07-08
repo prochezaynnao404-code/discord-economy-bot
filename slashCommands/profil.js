@@ -103,7 +103,7 @@ module.exports = {
 
                 ctx.fillStyle = "white";
 
-                ctx.font = "40px sans-serif";
+                ctx.font = "bold 40px Arial";
 
                 ctx.fillText(
 
@@ -115,7 +115,7 @@ module.exports = {
 
                 );
 
-                ctx.font = "26px sans-serif";
+                ctx.font = "24px Arial";
 
                 ctx.fillText(
 
