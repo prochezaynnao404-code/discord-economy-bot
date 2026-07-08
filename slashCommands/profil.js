@@ -125,7 +125,7 @@ module.exports = {
 
                 ctx.fillText(
 
-                    `⭐ Niveau : ${data.level}`,
+                    `Niveau : ${data.level}`,
 
                     240,
 
@@ -135,7 +135,7 @@ module.exports = {
 
                 ctx.fillText(
 
-                    `💰 Argent : ${data.money}$`,
+                    `$Argent : ${data.money}$`,
 
                     70,
 
@@ -145,7 +145,7 @@ module.exports = {
 
                 ctx.fillText(
 
-                    `🏦 Banque : ${data.bank}$`,
+                    `$Banque : ${data.bank}$`,
 
                     70,
 
@@ -155,7 +155,7 @@ module.exports = {
 
                 ctx.fillText(
 
-                    `💬 Messages : ${data.messages}`,
+                    `Messages : ${data.messages}`,
 
                     70,
 
@@ -163,19 +163,22 @@ module.exports = {
 
                 );
 
+                const voice =
+                    data.voiceTime || 0;
+
                 const hours =
                     Math.floor(
-                        data.voiceTime / 3600
+                        voice / 3600
                     );
 
                 const minutes =
                     Math.floor(
-                        (data.voiceTime % 3600) / 60
+                        (voice % 3600) / 60
                     );
 
                 ctx.fillText(
 
-                    `🔊 Vocal : ${hours}h ${minutes}m`,
+                    `Vocal : ${hours}h ${minutes}m`,
 
                     70,
 
@@ -185,7 +188,7 @@ module.exports = {
 
                 ctx.fillText(
 
-                    `📅 Arrivé : ${member.joinedAt.toLocaleDateString("fr-FR")}`,
+                    `Arrivé : ${member.joinedAt.toLocaleDateString("fr-FR")}`,
 
                     520,
 

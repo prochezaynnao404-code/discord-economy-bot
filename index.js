@@ -119,6 +119,41 @@ CREATE TABLE IF NOT EXISTS users (
 `);
 
 // =========================
+// MISE À JOUR DE LA TABLE
+// =========================
+
+db.run(
+    "ALTER TABLE users ADD COLUMN messages INTEGER DEFAULT 0",
+    err => {
+        if (err && !err.message.includes("duplicate column")) {
+            console.log(err);
+        }
+    }
+);
+
+db.run(
+    "ALTER TABLE users ADD COLUMN voiceTime INTEGER DEFAULT 0",
+    err => {
+        if (err && !err.message.includes("duplicate column")) {
+            console.log(err);
+        }
+    }
+);
+
+db.run(
+    "ALTER TABLE users ADD COLUMN bank INTEGER DEFAULT 0",
+    err => {
+        if (err && !err.message.includes("duplicate column")) {
+            console.log(err);
+        }
+    }
+);
+
+db.all("PRAGMA table_info(users)", (err, rows) => {
+    console.log(rows);
+});
+
+// =========================
 // CREATE USER
 // =========================
 
