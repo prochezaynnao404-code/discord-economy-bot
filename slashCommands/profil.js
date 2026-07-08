@@ -5,8 +5,14 @@ const {
 
 const {
     createCanvas,
-    loadImage
+    loadImage,
+    GlobalFonts
 } = require("@napi-rs/canvas");
+
+GlobalFonts.registerFromPath(
+    "./assets/fonts/Poppins-Bold.ttf",
+    "Poppins"
+);
 
 module.exports = {
 
@@ -67,13 +73,13 @@ module.exports = {
                 ctx.fillRect(0, 0, 1000, 500);
 
                 // Avatar
-                const avatar =
-                    await loadImage(
-                        user.displayAvatarURL({
-                            extension: "png",
-                            size: 512
-                        })
-                    );
+                const avatar = await loadImage(
+                    user.displayAvatarURL({
+                        extension: "png",
+                        forceStatic: true,
+                        size: 512
+                    })
+                );
 
                 ctx.save();
 
@@ -103,7 +109,7 @@ module.exports = {
 
                 ctx.fillStyle = "white";
 
-                ctx.font = "bold 40px Arial";
+                ctx.font = "40px Poppins";
 
                 ctx.fillText(
 
@@ -115,7 +121,7 @@ module.exports = {
 
                 );
 
-                ctx.font = "24px Arial";
+                ctx.font = "24px Poppins";
 
                 ctx.fillText(
 
