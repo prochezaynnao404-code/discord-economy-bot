@@ -298,26 +298,26 @@ module.exports = {
                     220
                 );
 
-                const attachment =
-                    new AttachmentBuilder(
-
+                const attachment = new AttachmentBuilder(
                         await canvas.encode("png"),
-
                         {
                             name: "profil.png"
                         }
-
                     );
 
-                interaction.reply({
+                        interaction.reply({
 
-                    files: [
+                            files: [
 
-                        attachment
+                                attachment
 
-                    ]
+                            ]
 
-                });
+                        });
+
+                    }
+
+                );
 
             }
 
