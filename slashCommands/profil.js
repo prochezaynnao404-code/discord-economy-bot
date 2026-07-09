@@ -300,21 +300,16 @@ module.exports = {
                 );
 
                 y += spacing;
+                
+                const days = Math.floor(
+                    (Date.now() - member.joinedTimestamp) / 86400000
+                );
 
                 ctx.fillText(
                     `Depuis ${days} jours`,
                     rightX,
                     y
                 );
-
-                
-
-                const days =
-                    Math.floor(
-                        (Date.now() - member.joinedTimestamp) / 86400000
-                    );
-
-                
 
                 const attachment = new AttachmentBuilder(
                         await canvas.encode("png"),
