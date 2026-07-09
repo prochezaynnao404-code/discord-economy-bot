@@ -77,6 +77,9 @@ module.exports = {
                 const ctx =
                     canvas.getContext("2d");
 
+                    ctx.textBaseline = "middle";
+                    ctx.textAlign = "left";
+
                 // Fond
                 let color = "#4CAF50";
 
@@ -275,28 +278,43 @@ module.exports = {
 
                 ctx.fillStyle = "white";
 
-                ctx.fillText(
-                    `🏆 Rang : #${rank}`,
-                    700,
-                    120
-                );
+                const rightX = 700;
+                let y = 120;
+                const spacing = 70;
+
+                ctx.fillStyle = "white";
+                ctx.font = "bold 28px Arial";
 
                 ctx.fillText(
-                    `🔥 Daily : ${data.dailyStreak}/10`,
-                    700,
-                    170
+                    `Rang : #${rank}`,
+                    rightX,
+                    y
                 );
+
+                y += spacing;
+
+                ctx.fillText(
+                    `Daily : ${data.dailyStreak}/10`,
+                    rightX,
+                    y
+                );
+
+                y += spacing;
+
+                ctx.fillText(
+                    `Depuis ${days} jours`,
+                    rightX,
+                    y
+                );
+
+                
 
                 const days =
                     Math.floor(
                         (Date.now() - member.joinedTimestamp) / 86400000
                     );
 
-                ctx.fillText(
-                    `📅 Depuis ${days} jours`,
-                    700,
-                    220
-                );
+                
 
                 const attachment = new AttachmentBuilder(
                         await canvas.encode("png"),
