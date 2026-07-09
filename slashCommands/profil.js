@@ -292,6 +292,10 @@ module.exports = {
                 ctx.fillText(`Daily : ${data.dailyStreak}/10`, rightX, y);
 
                 y += spacing;
+                
+                const days = Math.floor(
+                    (Date.now() - member.joinedTimestamp) / 86400000
+                );
 
                 ctx.fillText(`Depuis ${days} jours`, rightX, y);
 
