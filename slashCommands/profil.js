@@ -71,35 +71,48 @@ module.exports = {
                                 u => u.userId === user.id
                             ) + 1;
 
-                const canvas =
-                    createCanvas(1000, 500);
+                const canvas = createCanvas(1000, 600);
+                const ctx = canvas.getContext("2d");
 
-                const ctx =
-                    canvas.getContext("2d");
+                // Fond extérieur
+                ctx.fillStyle = "#2ecc71";
+                ctx.fillRect(0, 0, 1000, 600);
 
-                    ctx.textBaseline = "middle";
-                    ctx.textAlign = "left";
+               // Carte
+               ctx.beginPath();
+               ctx.roundRect(20, 20, 960, 560, 25);
+               ctx.fillStyle = "#101317";
+               ctx.fill();
 
-                // Fond
-                let color = "#4CAF50";
+               // Dégradé
+               const gradient = ctx.createLinearGradient(0, 0, 1000, 600);
+                gradient.addColorStop(0, "rgba(255,255,255,0.03)");
+                gradient.addColorStop(1, "rgba(0,0,0,0)");
 
-                if (data.level >= 10)
-                    color = "#3498db";
+               ctx.fillStyle = gradient;
+               ctx.fill();
 
-                if (data.level >= 20)
-                    color = "#9b59b6";
+               ctx.strokeStyle = "#2b2f36";
+               ctx.lineWidth = 3;
 
-                if (data.level >= 35)
-                    color = "#f39c12";
+               // séparation horizontale
+               ctx.beginPath();
+               ctx.moveTo(70, 260);
+               ctx.lineTo(930, 260);
+               ctx.stroke();
 
-                if (data.level >= 50)
-                    color = "#e74c3c";
+              // séparation verticale
+              ctx.beginPath();
+              ctx.moveTo(560, 40);
+              ctx.lineTo(560, 220);
+              ctx.stroke();
 
-                ctx.fillStyle = color;
-                ctx.fillRect(0, 0, 1000, 500);
+              // séparation verticale
+              ctx.beginPath();
+              ctx.moveTo(500, 285);
+              ctx.lineTo(500, 540);
+              ctx.stroke();
 
-                ctx.fillStyle = "#1b1b1b";
-                ctx.fillRect(15, 15, 970, 470);
 
                 // Avatar
                 const avatar = await loadImage(
