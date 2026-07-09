@@ -278,7 +278,7 @@ module.exports = {
 
                 ctx.fillStyle = "white";
 
-                const rightX = 580;
+                const rightX = 740;
                 let y = 110;
                 const spacing = 65;
 
