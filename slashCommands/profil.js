@@ -278,38 +278,22 @@ module.exports = {
 
                 ctx.fillStyle = "white";
 
-                const rightX = 700;
-                let y = 120;
-                const spacing = 70;
+                const rightX = 580;
+                let y = 110;
+                const spacing = 65;
 
+                ctx.font = "bold 26px Arial";
                 ctx.fillStyle = "white";
-                ctx.font = "bold 28px Arial";
 
-                ctx.fillText(
-                    `Rang : #${rank}`,
-                    rightX,
-                    y
-                );
+                ctx.fillText(`Rang : #${rank}`, rightX, y);
 
                 y += spacing;
 
-                ctx.fillText(
-                    `Daily : ${data.dailyStreak}/10`,
-                    rightX,
-                    y
-                );
+                ctx.fillText(`Daily : ${data.dailyStreak}/10`, rightX, y);
 
                 y += spacing;
-                
-                const days = Math.floor(
-                    (Date.now() - member.joinedTimestamp) / 86400000
-                );
 
-                ctx.fillText(
-                    `Depuis ${days} jours`,
-                    rightX,
-                    y
-                );
+                ctx.fillText(`Depuis ${days} jours`, rightX, y);
 
                 const attachment = new AttachmentBuilder(
                         await canvas.encode("png"),
