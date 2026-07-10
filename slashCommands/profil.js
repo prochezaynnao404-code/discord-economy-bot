@@ -71,246 +71,355 @@ module.exports = {
                                 u => u.userId === user.id
                             ) + 1;
 
-                const canvas = createCanvas(1000, 600);
-                const ctx = canvas.getContext("2d");
-
-                // Fond extérieur
-                ctx.fillStyle = "#2ecc71";
-                ctx.fillRect(0, 0, 1000, 600);
+const canvas = createCanvas(1100, 650);
+const ctx = canvas.getContext("2d");
 
-               // Carte
-               ctx.beginPath();
-               ctx.roundRect(20, 20, 960, 560, 25);
-               ctx.fillStyle = "#101317";
-               ctx.fill();
+function card(x, y) {
 
-               // Dégradé
-               const gradient = ctx.createLinearGradient(0, 0, 1000, 600);
-                gradient.addColorStop(0, "rgba(255,255,255,0.03)");
-                gradient.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.beginPath();
 
-               ctx.fillStyle = gradient;
-               ctx.fill();
+    ctx.roundRect(
+        x,
+        y,
+        430,
+        60,
+        15
+    );
 
-               ctx.strokeStyle = "#2b2f36";
-               ctx.lineWidth = 3;
+    ctx.fillStyle = "#232b39";
 
-               // séparation horizontale
-               ctx.beginPath();
-               ctx.moveTo(70, 260);
-               ctx.lineTo(930, 260);
-               ctx.stroke();
+    ctx.fill();
 
-              // séparation verticale
-              ctx.beginPath();
-              ctx.moveTo(560, 40);
-              ctx.lineTo(560, 220);
-              ctx.stroke();
+}
 
-              // séparation verticale
-              ctx.beginPath();
-              ctx.moveTo(500, 285);
-              ctx.lineTo(500, 540);
-              ctx.stroke();
+// =====================
+// FOND
+// =====================
 
+const gradient =
+ctx.createLinearGradient(
+0,
+0,
+1100,
+650
+);
 
-                // Avatar
-                const avatar = await loadImage(
-                    user.displayAvatarURL({
-                        extension: "png",
-                        forceStatic: true,
-                        size: 512
-                    })
-                );
-                
-                ctx.beginPath();
+gradient.addColorStop(
+0,
+"#111827"
+);
 
-                ctx.arc(
-                    130,
-                    130,
-                    78,
-                    0,
-                Math.PI * 2
-                );
+gradient.addColorStop(
+1,
+"#1f2937"
+);
 
-                ctx.fillStyle = color;
-                ctx.fill();
+ctx.fillStyle = gradient;
 
-                ctx.save();
+ctx.fillRect(
+0,
+0,
+1100,
+650
+);
 
-                ctx.beginPath();
+ctx.beginPath();
 
-                ctx.arc(
-                    130,
-                    130,
-                    70,
-                    0,
-                    Math.PI * 2
-                );
+ctx.roundRect(
 
-                ctx.closePath();
+30,
 
-                ctx.clip();
+30,
 
-                ctx.drawImage(
-                    avatar,
-                    60,
-                    60,
-                    140,
-                    140
-                );
+1040,
 
-                ctx.restore();
+590,
 
-                ctx.fillStyle = "white";
+25
 
-                ctx.font = "40px Poppins";
+);
 
-                ctx.fillText(
+ctx.fillStyle =
+"#181f2b";
 
-                    user.username,
+ctx.fill();
 
-                    240,
+ctx.shadowColor =
+"rgba(0,0,0,0.45)";
 
-                    110
+ctx.shadowBlur = 35;
 
-                );
+ctx.fill();
 
-                ctx.font = "24px Poppins";
+ctx.shadowBlur = 0;
 
-                ctx.fillText(
+let accent = "#43b581";
 
-                    `Niveau : ${data.level}`,
+if(data.level >= 10)
+accent = "#3498db";
 
-                    240,
+if(data.level >= 25)
+accent = "#9b59b6";
 
-                    160
+if(data.level >= 50)
+accent = "#f39c12";
 
-                );
-                
-                const maxXP = data.level * 100;
+if(data.level >= 75)
+accent = "#e74c3c";
 
-                const percent =
-                      Math.min(
-                          data.xp / maxXP,
-                          1
-                      );
+ctx.fillStyle = accent;
 
-                ctx.fillStyle = "#444";
+ctx.fillRect(
 
-                ctx.fillRect(
-                    240,
-                    180,
-                    500,
-                    24
-                );
+30,
 
-                ctx.fillStyle = color;
+30,
 
-                ctx.fillRect(
-                    240,
-                    180,
-                    500 * percent,
-                    24
-                );
+1040,
 
-                ctx.fillStyle = "white";
+12
 
-                ctx.font = "18px Arial";
+);
 
-                ctx.fillText(
-                   `${data.xp}/${maxXP} XP`,
-                   250,
-                   198
-                );
+// =====================
+// AVATAR
+// =====================
 
-                ctx.fillText(
+const avatar = await loadImage(
+    user.displayAvatarURL({
+        extension: "png",
+        forceStatic: true,
+        size: 512
+    })
+);
 
-                    `$Argent : ${data.money}$`,
+// Halo
 
-                    70,
+ctx.beginPath();
 
-                    280
+ctx.arc(
+    140,
+    160,
+    100,
+    0,
+    Math.PI * 2
+);
 
-                );
+const moneyIcon = await loadImage("./assets/icons/money.png");
+const bankIcon = await loadImage("./assets/icons/bank.png");
+const messageIcon = await loadImage("./assets/icons/message.png");
+const voiceIcon = await loadImage("./assets/icons/voice.png");
+const calendarIcon = await loadImage("./assets/icons/calendar.png");
+const trophyIcon = await loadImage("./assets/icons/trophy.png");
 
-                ctx.fillText(
+ctx.fillStyle = accent + "33";
 
-                    `$Banque : ${data.bank}$`,
+ctx.fill();
 
-                    70,
+// Cercle extérieur
+ctx.beginPath();
+ctx.arc(140, 160, 85, 0, Math.PI * 2);
+ctx.fillStyle = accent;
+ctx.fill();
 
-                    330
+// Cercle intérieur
+ctx.save();
 
-                );
+ctx.beginPath();
+ctx.arc(140, 160, 75, 0, Math.PI * 2);
+ctx.closePath();
+ctx.clip();
 
-                ctx.fillText(
+ctx.shadowColor = accent;
+ctx.shadowBlur = 30;
+ctx.restore();
 
-                    `Messages : ${data.messages}`,
+ctx.shadowBlur = 0;
+ctx.drawImage(
+    avatar,
+    65,
+    85,
+    150,
+    150
+);
 
-                    70,
+ctx.restore();
 
-                    380
+// =====================
+// NOM
+// =====================
 
-                );
+ctx.fillStyle = "#ffffff";
+ctx.font = "bold 46px Poppins";
 
-                const voice =
-                    data.voiceTime || 0;
+ctx.fillText(
+    user.username,
+    250,
+    120
+);
 
-                const hours =
-                    Math.floor(
-                        voice / 3600
-                    );
+// =====================
+// NIVEAU
+// =====================
 
-                const minutes =
-                    Math.floor(
-                        (voice % 3600) / 60
-                    );
+ctx.font = "28px Poppins";
 
-                ctx.fillText(
+ctx.fillStyle = "#bbbbbb";
 
-                    `Vocal : ${hours}h ${minutes}m`,
+ctx.fillText(
+    "Niveau",
+    252,
+    170
+);
 
-                    70,
+ctx.fillStyle = accent;
 
-                    430
+ctx.font = "bold 34px Poppins";
 
-                );
+ctx.fillText(
+    String(data.level),
+    360,
+    170
+);
 
-                ctx.fillText(
+const maxXP = data.level * 100;
 
-                    `Arrivé : ${member.joinedAt.toLocaleDateString("fr-FR")}`,
+const percent =
+Math.min(
+    data.xp / maxXP,
+    1
+);
 
-                    520,
+// =====================
+// BARRE XP
+// =====================
 
-                    430
+// Fond
 
-                );
-                
-                ctx.font = "28px Arial";
+ctx.beginPath();
 
-                ctx.fillStyle = "white";
+ctx.roundRect(
+250,
+200,
+420,
+30,
+15
+);
 
-                const rightX = 740;
-                let y = 110;
-                const spacing = 65;
+ctx.fillStyle = "#2d3748";
+ctx.fill();
 
-                ctx.font = "bold 26px Arial";
-                ctx.fillStyle = "white";
+// Progression
 
-                ctx.fillText(`Rang : #${rank}`, rightX, y);
+ctx.beginPath();
 
-                y += spacing;
+ctx.roundRect(
+250,
+200,
+420 * percent,
+30,
+15
+);
 
-                ctx.fillText(`Daily : ${data.dailyStreak}/10`, rightX, y);
+ctx.fillStyle = accent;
 
-                y += spacing;
-                
-                const days = Math.floor(
-                    (Date.now() - member.joinedTimestamp) / 86400000
-                );
+ctx.fill();
 
-                ctx.fillText(`Depuis ${days} jours`, rightX, y);
+// =====================
+// COLONNE DE DROITE
+// =====================
+
+const days = Math.floor(
+    (Date.now() - member.joinedTimestamp) / 86400000
+);
+
+ctx.fillStyle = "#bfc7d5";
+ctx.font = "22px Poppins";
+
+ctx.fillText("🏆 Rang", 760, 110);
+ctx.fillText("🔥 Daily", 760, 170);
+ctx.fillText("📅 Depuis", 760, 230);
+
+ctx.fillStyle = "white";
+ctx.font = "bold 26px Poppins";
+
+ctx.fillText(`#${rank}`, 930, 110);
+ctx.fillText(`${data.dailyStreak}/10`, 930, 170);
+ctx.fillText(`${days} jours`, 930, 230);
+
+ctx.strokeStyle = "#2c3444";
+ctx.lineWidth = 2;
+
+ctx.beginPath();
+ctx.moveTo(70, 300);
+ctx.lineTo(1030, 300);
+ctx.stroke();
+
+// =====================
+// STATISTIQUES
+// =====================
+
+const voice = data.voiceTime || 0;
+
+const hours = Math.floor(voice / 3600);
+
+const minutes = Math.floor(
+    (voice % 3600) / 60
+);
+
+ctx.fillStyle = "#cfd5df";
+ctx.font = "22px Poppins";
+
+ctx.drawImage(moneyIcon, 80, 335, 30, 30);
+ctx.drawImage(bankIcon, 80, 405, 30, 30);
+ctx.drawImage(messageIcon, 80, 475, 30, 30);
+
+ctx.drawImage(voiceIcon, 560, 335, 30, 30);
+ctx.drawImage(calendarIcon, 560, 405, 30, 30);
+
+ctx.drawImage(trophyIcon, 760, 85, 30, 30);
+
+// Colonne gauche
+
+ctx.fillText("Argent", 80, 360);
+ctx.fillText("Banque", 80, 430);
+ctx.fillText("Messages", 80, 500);
+
+// Colonne droite
+
+ctx.fillText("Vocal", 560, 360);
+ctx.fillText("Arrivé", 560, 430);
+ctx.fillText("XP", 560, 500);
+
+ctx.fillStyle = "white";
+ctx.font = "bold 24px Poppins";
+
+ctx.fillText(`${data.money.toLocaleString()} $`, 250, 360);
+
+ctx.fillText(`${data.bank.toLocaleString()} $`, 250, 430);
+
+ctx.fillText(`${data.messages.toLocaleString()}`, 250, 500);
+
+ctx.fillText(`${hours}h ${minutes}m`, 720, 360);
+
+ctx.fillText(
+    member.joinedAt.toLocaleDateString("fr-FR"),
+    720,
+    430
+);
+
+ctx.fillText(`${data.xp}/${maxXP}`, 720, 500);
+
+ctx.fillStyle = "white";
+
+ctx.font = "20px Poppins";
+
+ctx.fillText(
+`${data.xp} / ${maxXP} XP`,
+360,
+222
+);
+
 
                 const attachment = new AttachmentBuilder(
                         await canvas.encode("png"),
