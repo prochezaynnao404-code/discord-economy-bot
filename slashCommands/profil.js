@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 
 const {
@@ -76,32 +77,28 @@ module.exports = {
 const canvas = createCanvas(1100, 650);
 const ctx = canvas.getContext("2d");
 const moneyIcon = await loadImage(
-
-    path.join(__dirname, "../assets/icons/money.png")
+    
+    fs.readFileSync(path.join(__dirname, "../assets/icons/money.png"))
 );
 
 const bankIcon = await loadImage(
-    path.join(__dirname, "../assets/icons/bank.png")
+    fs.readFileSync(path.join(__dirname, "../assets/icons/bank.png"))
 );
 
 const messageIcon = await loadImage(
-    path.join(__dirname, "../assets/icons/message.png")
+    fs.readFileSync(path.join(__dirname, "../assets/icons/message.png"))
 );
 
 const micIcon = await loadImage(
-    path.join(__dirname, "../assets/icons/mic.png")
-);
-
-const trophyIcon = await loadImage(
-    path.join(__dirname, "../assets/icons/trophy.png")
+    fs.readFileSync(path.join(__dirname, "../assets/icons/mic.png"))
 );
 
 const calendarIcon = await loadImage(
-    path.join(__dirname, "../assets/icons/calendar.png")
+    fs.readFileSync(path.join(__dirname, "../assets/icons/calendar.png"))
 );
 
-const clockIcon = await loadImage(
-    path.join(__dirname, "../assets/icons/clock.png")
+const trophyIcon = await loadImage(
+    fs.readFileSync(path.join(__dirname, "../assets/icons/trophy.png"))
 );
 
 function card(x, y) {
