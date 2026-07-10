@@ -77,7 +77,7 @@ module.exports = {
 const canvas = createCanvas(1100, 650);
 const ctx = canvas.getContext("2d");
 const moneyIcon = await loadImage(
-    
+
     fs.readFileSync(path.join(__dirname, "../assets/icons/money.png"))
 );
 
@@ -100,8 +100,6 @@ const calendarIcon = await loadImage(
 const trophyIcon = await loadImage(
     fs.readFileSync(path.join(__dirname, "../assets/icons/trophy.png"))
 );
-
-function card(x, y) {
 
     ctx.beginPath();
 
@@ -168,8 +166,6 @@ ctx.roundRect(
 
 ctx.fillStyle =
 "#181f2b";
-
-ctx.fill();
 
 ctx.shadowColor =
 "rgba(0,0,0,0.45)";
@@ -249,8 +245,8 @@ ctx.restore();
 // NOM
 // =====================
 
-ctx.fillStyle = "#ffffff";
-ctx.font = "bold 46px Poppins";
+ctx.fillStyle = "#fffffe";
+ctx.font = "46px Poppins";
 
 ctx.fillText(
     user.username,
@@ -335,7 +331,7 @@ const days = Math.floor(
 
 ctx.drawImage(trophyIcon, 760, 78, 28, 28);
 ctx.drawImage(calendarIcon, 760, 138, 28, 28);
-ctx.drawImage(voiceIcon, 760, 198, 28, 28);
+ctx.drawImage(micIcon, 760, 198, 28, 28);
 
 ctx.fillStyle = "#cfd5df";
 ctx.font = "22px Poppins";
@@ -412,12 +408,6 @@ ctx.fillText(
 ctx.fillStyle = "white";
 
 ctx.font = "20px Poppins";
-
-ctx.fillText(
-`${data.xp} / ${maxXP} XP`,
-360,
-222
-);
 
 
                 const attachment = new AttachmentBuilder(
