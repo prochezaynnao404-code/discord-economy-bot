@@ -335,7 +335,7 @@ const days = Math.floor(
 
 ctx.drawImage(trophyIcon, 760, 78, 28, 28);
 ctx.drawImage(calendarIcon, 760, 138, 28, 28);
-ctx.drawImage(clockIcon, 760, 198, 28, 28);
+ctx.drawImage(voiceIcon, 760, 198, 28, 28);
 
 ctx.fillStyle = "#cfd5df";
 ctx.font = "22px Poppins";
