@@ -1,3 +1,5 @@
+const path = require("path");
+
 const {
     SlashCommandBuilder,
     AttachmentBuilder
@@ -74,6 +76,7 @@ module.exports = {
 const canvas = createCanvas(1100, 650);
 const ctx = canvas.getContext("2d");
 const moneyIcon = await loadImage(
+
     path.join(__dirname, "../assets/icons/money.png")
 );
 
