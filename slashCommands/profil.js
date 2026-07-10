@@ -73,13 +73,33 @@ module.exports = {
 
 const canvas = createCanvas(1100, 650);
 const ctx = canvas.getContext("2d");
-const trophyIcon = await loadImage("./assets/icons/trophy.png");
-const calendarIcon = await loadImage("./assets/icons/calendar.png");
-const clockIcon = await loadImage("./assets/icons/clock.png");
-const moneyIcon = await loadImage("./assets/icons/money.png");
-const bankIcon = await loadImage("./assets/icons/bank.png");
-const messageIcon = await loadImage("./assets/icons/message.png");
-const micIcon = await loadImage("./assets/icons/mic.png");
+const moneyIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/money.png")
+);
+
+const bankIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/bank.png")
+);
+
+const messageIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/message.png")
+);
+
+const micIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/mic.png")
+);
+
+const trophyIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/trophy.png")
+);
+
+const calendarIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/calendar.png")
+);
+
+const clockIcon = await loadImage(
+    path.join(__dirname, "../assets/icons/clock.png")
+);
 
 function card(x, y) {
 
