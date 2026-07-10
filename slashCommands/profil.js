@@ -101,22 +101,6 @@ const trophyIcon = await loadImage(
     fs.readFileSync(path.join(__dirname, "../assets/icons/trophy.png"))
 );
 
-    ctx.beginPath();
-
-    ctx.roundRect(
-        x,
-        y,
-        430,
-        60,
-        15
-    );
-
-    ctx.fillStyle = "#232b39";
-
-    ctx.fill();
-
-}
-
 // =====================
 // FOND
 // =====================
