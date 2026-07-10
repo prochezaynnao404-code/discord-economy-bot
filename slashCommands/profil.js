@@ -73,6 +73,13 @@ module.exports = {
 
 const canvas = createCanvas(1100, 650);
 const ctx = canvas.getContext("2d");
+const trophyIcon = await loadImage("./assets/icons/trophy.png");
+const calendarIcon = await loadImage("./assets/icons/calendar.png");
+const clockIcon = await loadImage("./assets/icons/clock.png");
+const moneyIcon = await loadImage("./assets/icons/money.png");
+const bankIcon = await loadImage("./assets/icons/bank.png");
+const messageIcon = await loadImage("./assets/icons/message.png");
+const micIcon = await loadImage("./assets/icons/mic.png");
 
 function card(x, y) {
 
@@ -185,6 +192,7 @@ ctx.fillRect(
 // AVATAR
 // =====================
 
+// Avatar
 const avatar = await loadImage(
     user.displayAvatarURL({
         extension: "png",
@@ -193,54 +201,26 @@ const avatar = await loadImage(
     })
 );
 
-// Halo
-
+// Cercle vert
 ctx.beginPath();
-
-ctx.arc(
-    140,
-    160,
-    100,
-    0,
-    Math.PI * 2
-);
-
-const moneyIcon = await loadImage("./assets/icons/money.png");
-const bankIcon = await loadImage("./assets/icons/bank.png");
-const messageIcon = await loadImage("./assets/icons/message.png");
-const voiceIcon = await loadImage("./assets/icons/voice.png");
-const calendarIcon = await loadImage("./assets/icons/calendar.png");
-const trophyIcon = await loadImage("./assets/icons/trophy.png");
-
-ctx.fillStyle = accent + "33";
-
-ctx.fill();
-
-// Cercle extérieur
-ctx.beginPath();
-ctx.arc(140, 160, 85, 0, Math.PI * 2);
+ctx.arc(110, 110, 74, 0, Math.PI * 2);
 ctx.fillStyle = accent;
 ctx.fill();
 
-// Cercle intérieur
+// Découpe ronde
 ctx.save();
 
 ctx.beginPath();
-ctx.arc(140, 160, 75, 0, Math.PI * 2);
+ctx.arc(110, 110, 66, 0, Math.PI * 2);
 ctx.closePath();
 ctx.clip();
 
-ctx.shadowColor = accent;
-ctx.shadowBlur = 30;
-ctx.restore();
-
-ctx.shadowBlur = 0;
 ctx.drawImage(
     avatar,
-    65,
-    85,
-    150,
-    150
+    44,
+    44,
+    132,
+    132
 );
 
 ctx.restore();
@@ -333,19 +313,23 @@ const days = Math.floor(
     (Date.now() - member.joinedTimestamp) / 86400000
 );
 
-ctx.fillStyle = "#bfc7d5";
+ctx.drawImage(trophyIcon, 760, 78, 28, 28);
+ctx.drawImage(calendarIcon, 760, 138, 28, 28);
+ctx.drawImage(clockIcon, 760, 198, 28, 28);
+
+ctx.fillStyle = "#cfd5df";
 ctx.font = "22px Poppins";
 
-ctx.fillText("🏆 Rang", 760, 110);
-ctx.fillText("🔥 Daily", 760, 170);
-ctx.fillText("📅 Depuis", 760, 230);
+ctx.fillText("Rang", 805, 100);
+ctx.fillText("Daily", 805, 160);
+ctx.fillText("Depuis", 805, 220);
 
 ctx.fillStyle = "white";
 ctx.font = "bold 26px Poppins";
 
-ctx.fillText(`#${rank}`, 930, 110);
-ctx.fillText(`${data.dailyStreak}/10`, 930, 170);
-ctx.fillText(`${days} jours`, 930, 230);
+ctx.fillText(`#${rank}`, 950, 100);
+ctx.fillText(`${data.dailyStreak}/10`, 950, 160);
+ctx.fillText(`${days} jours`, 950, 220);
 
 ctx.strokeStyle = "#2c3444";
 ctx.lineWidth = 2;
@@ -370,26 +354,23 @@ const minutes = Math.floor(
 ctx.fillStyle = "#cfd5df";
 ctx.font = "22px Poppins";
 
-ctx.drawImage(moneyIcon, 80, 335, 30, 30);
-ctx.drawImage(bankIcon, 80, 405, 30, 30);
-ctx.drawImage(messageIcon, 80, 475, 30, 30);
+ctx.drawImage(moneyIcon, 38, 338, 26, 26);
+ctx.drawImage(bankIcon,38,405,26,26);
 
-ctx.drawImage(voiceIcon, 560, 335, 30, 30);
-ctx.drawImage(calendarIcon, 560, 405, 30, 30);
+ctx.drawImage(messageIcon,38,472,26,26);
 
-ctx.drawImage(trophyIcon, 760, 85, 30, 30);
+ctx.drawImage(micIcon,520,338,26,26);
+
+ctx.drawImage(calendarIcon,520,405,26,26);
 
 // Colonne gauche
 
-ctx.fillText("Argent", 80, 360);
-ctx.fillText("Banque", 80, 430);
-ctx.fillText("Messages", 80, 500);
+ctx.fillText("Argent",80,360);
+ctx.fillText("Banque",80,427);
+ctx.fillText("Messages",80,494);
 
-// Colonne droite
-
-ctx.fillText("Vocal", 560, 360);
-ctx.fillText("Arrivé", 560, 430);
-ctx.fillText("XP", 560, 500);
+ctx.fillText("Vocal",560,360);
+ctx.fillText("Arrivé",560,427);
 
 ctx.fillStyle = "white";
 ctx.font = "bold 24px Poppins";
@@ -407,8 +388,6 @@ ctx.fillText(
     720,
     430
 );
-
-ctx.fillText(`${data.xp}/${maxXP}`, 720, 500);
 
 ctx.fillStyle = "white";
 
