@@ -28,7 +28,7 @@ module.exports = {
         .addUserOption(option =>
             option
                 .setName("joueur")
-                .setDescription("Profil d'un joueur")
+                .setDescription("Le joueur")
                 .setRequired(false)
         ),
 
@@ -64,9 +64,11 @@ module.exports = {
                     });
 
                 }
-                
+
                 db.all(
-                   "SELECT userId FROM users ORDER BY level DESC, xp DESC",
+
+                    "SELECT userId FROM users ORDER BY level DESC, xp DESC",
+
                     async (err, rows) => {
 
                         const rank =
@@ -74,274 +76,364 @@ module.exports = {
                                 u => u.userId === user.id
                             ) + 1;
 
-const canvas = createCanvas(1100, 650);
-const ctx = canvas.getContext("2d");
-const moneyIcon = await loadImage(
+                        const canvas =
+                            createCanvas(
+                                1100,
+                                650
+                            );
+
+                        const ctx =
+                            canvas.getContext("2d");
+
+                        const moneyIcon =
+                            await loadImage(
+                                fs.readFileSync(
+                                    path.join(
+                                        __dirname,
+                                        "../assets/icons/money.png"
+                                    )
+                                )
+                            );
+
+                        const bankIcon =
+                            await loadImage(
+                                fs.readFileSync(
+                                    path.join(
+                                        __dirname,
+                                        "../assets/icons/bank.png"
+                                    )
+                                )
+                            );
+
+                        const messageIcon =
+                            await loadImage(
+                                fs.readFileSync(
+                                    path.join(
+                                        __dirname,
+                                        "../assets/icons/message.png"
+                                    )
+                                )
+                            );
+
+                        const micIcon =
+                            await loadImage(
+                                fs.readFileSync(
+                                    path.join(
+                                        __dirname,
+                                        "../assets/icons/mic.png"
+                                    )
+                                )
+                            );
+
+                        const trophyIcon =
+                            await loadImage(
+                                fs.readFileSync(
+                                    path.join(
+                                        __dirname,
+                                        "../assets/icons/trophy.png"
+                                    )
+                                )
+                            );
+
+                        const calendarIcon =
+                            await loadImage(
+                                fs.readFileSync(
+                                    path.join(
+                                        __dirname,
+                                        "../assets/icons/calendar.png"
+                                    )
+                                )
+                            );
+                                                    // ==========================
+                        // FOND
+                        // ==========================
+
+                        const gradient =
+                            ctx.createLinearGradient(
+                                0,
+                                0,
+                                1100,
+                                650
+                            );
+
+                        gradient.addColorStop(
+                            0,
+                            "#0f172a"
+                        );
+
+                        gradient.addColorStop(
+                            1,
+                            "#1e293b"
+                        );
+
+                        ctx.fillStyle = gradient;
+
+                        ctx.fillRect(
+                            0,
+                            0,
+                            1100,
+                            650
+                        );
+
+                        ctx.beginPath();
+
+                        ctx.roundRect(
+                            30,
+                            30,
+                            1040,
+                            590,
+                            30
+                        );
 
-    fs.readFileSync(path.join(__dirname, "../assets/icons/money.png"))
-);
+                        ctx.fillStyle =
+                            "#161d29";
 
-const bankIcon = await loadImage(
-    fs.readFileSync(path.join(__dirname, "../assets/icons/bank.png"))
-);
+                        ctx.fill();
 
-const messageIcon = await loadImage(
-    fs.readFileSync(path.join(__dirname, "../assets/icons/message.png"))
-);
+                        // ==========================
+                        // COULEUR DU NIVEAU
+                        // ==========================
 
-const micIcon = await loadImage(
-    fs.readFileSync(path.join(__dirname, "../assets/icons/mic.png"))
-);
+                        let accent =
+                            "#43b581";
 
-const calendarIcon = await loadImage(
-    fs.readFileSync(path.join(__dirname, "../assets/icons/calendar.png"))
-);
+                        if (data.level >= 10)
+                            accent = "#3498db";
 
-const trophyIcon = await loadImage(
-    fs.readFileSync(path.join(__dirname, "../assets/icons/trophy.png"))
-);
+                        if (data.level >= 25)
+                            accent = "#9b59b6";
 
-// =====================
-// FOND
-// =====================
+                        if (data.level >= 50)
+                            accent = "#f39c12";
 
-const gradient =
-ctx.createLinearGradient(
-0,
-0,
-1100,
-650
-);
+                        if (data.level >= 75)
+                            accent = "#e74c3c";
 
-gradient.addColorStop(
-0,
-"#111827"
-);
+                        ctx.fillStyle =
+                            accent;
 
-gradient.addColorStop(
-1,
-"#1f2937"
-);
+                        ctx.fillRect(
+                            30,
+                            30,
+                            1040,
+                            10
+                        );
 
-ctx.fillStyle = gradient;
+                        // ==========================
+                        // AVATAR
+                        // ==========================
 
-ctx.fillRect(
-0,
-0,
-1100,
-650
-);
+                        const avatar =
+                            await loadImage(
 
-ctx.beginPath();
+                                user.displayAvatarURL({
 
-ctx.roundRect(
+                                    extension: "png",
 
-30,
+                                    forceStatic: true,
 
-30,
+                                    size: 512
 
-1040,
+                                })
 
-590,
+                            );
 
-25
+                        // Contour
 
-);
+                        ctx.beginPath();
 
-ctx.fillStyle =
-"#181f2b";
+                        ctx.arc(
+                            120,
+                            120,
+                            78,
+                            0,
+                            Math.PI * 2
+                        );
 
-ctx.shadowColor =
-"rgba(0,0,0,0.45)";
+                        ctx.fillStyle =
+                            accent;
 
-ctx.shadowBlur = 35;
+                        ctx.fill();
 
-ctx.fill();
+                        // Avatar rond
 
-ctx.shadowBlur = 0;
+                        ctx.save();
 
-let accent = "#43b581";
+                        ctx.beginPath();
 
-if(data.level >= 10)
-accent = "#3498db";
+                        ctx.arc(
+                            120,
+                            120,
+                            70,
+                            0,
+                            Math.PI * 2
+                        );
 
-if(data.level >= 25)
-accent = "#9b59b6";
+                        ctx.closePath();
 
-if(data.level >= 50)
-accent = "#f39c12";
+                        ctx.clip();
 
-if(data.level >= 75)
-accent = "#e74c3c";
+                        ctx.drawImage(
+                            avatar,
+                            50,
+                            50,
+                            140,
+                            140
+                        );
 
-ctx.fillStyle = accent;
+                        ctx.restore();
 
-ctx.fillRect(
+                        // ==========================
+                        // NOM
+                        // ==========================
 
-30,
+                        ctx.fillStyle =
+                            "white";
 
-30,
+                        ctx.font =
+                            "bold 42px Poppins";
 
-1040,
+                        ctx.fillText(
+                            user.username,
+                            240,
+                            110
+                        );
 
-12
+                        // ==========================
+                        // NIVEAU
+                        // ==========================
 
-);
+                        ctx.font =
+                            "24px Poppins";
 
-// =====================
-// AVATAR
-// =====================
+                        ctx.fillStyle =
+                            "#b8c1cc";
 
-// Avatar
-const avatar = await loadImage(
-    user.displayAvatarURL({
-        extension: "png",
-        forceStatic: true,
-        size: 512
-    })
-);
+                        ctx.fillText(
+                            "Niveau",
+                            240,
+                            160
+                        );
 
-// Cercle vert
-ctx.beginPath();
-ctx.arc(110, 110, 74, 0, Math.PI * 2);
-ctx.fillStyle = accent;
-ctx.fill();
+                        ctx.font =
+                            "bold 30px Poppins";
 
-// Découpe ronde
-ctx.save();
+                        ctx.fillStyle =
+                            accent;
 
-ctx.beginPath();
-ctx.arc(110, 110, 66, 0, Math.PI * 2);
-ctx.closePath();
-ctx.clip();
+                        ctx.fillText(
+                            String(data.level),
+                            350,
+                            160
+                        );
 
-ctx.drawImage(
-    avatar,
-    44,
-    44,
-    132,
-    132
-);
+                        // ==========================
+                        // BARRE XP
+                        // ==========================
 
-ctx.restore();
+                        const maxXP =
+                            data.level * 100;
 
-// =====================
-// NOM
-// =====================
+                        const percent =
+                            Math.min(
+                                data.xp / maxXP,
+                                1
+                            );
 
-ctx.fillStyle = "#fffffe";
-ctx.font = "46px Poppins";
+                        ctx.beginPath();
 
-ctx.fillText(
-    user.username,
-    250,
-    120
-);
+                        ctx.roundRect(
+                            240,
+                            190,
+                            420,
+                            28,
+                            14
+                        );
 
-// =====================
-// NIVEAU
-// =====================
+                        ctx.fillStyle =
+                            "#2c3444";
 
-ctx.font = "28px Poppins";
+                        ctx.fill();
 
-ctx.fillStyle = "#bbbbbb";
+                        ctx.beginPath();
 
-ctx.fillText(
-    "Niveau",
-    252,
-    170
-);
+                        ctx.roundRect(
+                            240,
+                            190,
+                            420 * percent,
+                            28,
+                            14
+                        );
 
-ctx.fillStyle = accent;
+                        ctx.fillStyle =
+                            accent;
 
-ctx.font = "bold 34px Poppins";
+                        ctx.fill();
 
-ctx.fillText(
-    String(data.level),
-    360,
-    170
-);
+                        ctx.fillStyle =
+                            "white";
 
-const maxXP = data.level * 100;
+                        ctx.font =
+                            "18px Poppins";
 
-const percent =
-Math.min(
-    data.xp / maxXP,
-    1
-);
-
-// =====================
-// BARRE XP
-// =====================
-
-// Fond
-
-ctx.beginPath();
-
-ctx.roundRect(
-250,
-200,
-420,
-30,
-15
-);
-
-ctx.fillStyle = "#2d3748";
-ctx.fill();
-
-// Progression
-
-ctx.beginPath();
-
-ctx.roundRect(
-250,
-200,
-420 * percent,
-30,
-15
-);
-
-ctx.fillStyle = accent;
-
-ctx.fill();
-
-// =====================
+                        ctx.fillText(
+                            `${data.xp} / ${maxXP} XP`,
+                            360,
+                            210
+                        );
+ // ==========================
 // COLONNE DE DROITE
-// =====================
+// ==========================
 
 const days = Math.floor(
     (Date.now() - member.joinedTimestamp) / 86400000
 );
 
-ctx.drawImage(trophyIcon, 760, 78, 28, 28);
-ctx.drawImage(calendarIcon, 760, 138, 28, 28);
-ctx.drawImage(micIcon, 760, 198, 28, 28);
+// Rang
+ctx.drawImage(trophyIcon, 720, 75, 30, 30);
 
-ctx.fillStyle = "#cfd5df";
+ctx.fillStyle = "#aab4c3";
 ctx.font = "22px Poppins";
-
-ctx.fillText("Rang", 805, 100);
-ctx.fillText("Daily", 805, 160);
-ctx.fillText("Depuis", 805, 220);
+ctx.fillText("Rang", 765, 98);
 
 ctx.fillStyle = "white";
-ctx.font = "bold 26px Poppins";
+ctx.font = "bold 28px Poppins";
+ctx.fillText(`#${rank}`, 930, 98);
 
-ctx.fillText(`#${rank}`, 950, 100);
-ctx.fillText(`${data.dailyStreak}/10`, 950, 160);
-ctx.fillText(`${days} jours`, 950, 220);
+// Daily
+ctx.drawImage(calendarIcon, 720, 145, 30, 30);
 
-ctx.strokeStyle = "#2c3444";
+ctx.fillStyle = "#aab4c3";
+ctx.font = "22px Poppins";
+ctx.fillText("Daily", 765, 168);
+
+ctx.fillStyle = "white";
+ctx.font = "bold 28px Poppins";
+ctx.fillText(`${data.dailyStreak}/10`, 930, 168);
+
+// Depuis
+ctx.drawImage(micIcon, 720, 215, 30, 30);
+
+ctx.fillStyle = "#aab4c3";
+ctx.font = "22px Poppins";
+ctx.fillText("Depuis", 765, 238);
+
+ctx.fillStyle = "white";
+ctx.font = "bold 28px Poppins";
+ctx.fillText(`${days} jours`, 930, 238);
+
+// Ligne de séparation
+
+ctx.strokeStyle = "#2d3748";
 ctx.lineWidth = 2;
 
 ctx.beginPath();
-ctx.moveTo(70, 300);
-ctx.lineTo(1030, 300);
+ctx.moveTo(60, 290);
+ctx.lineTo(1040, 290);
 ctx.stroke();
-
-// =====================
+// ==========================
 // STATISTIQUES
-// =====================
+// ==========================
 
 const voice = data.voiceTime || 0;
 
@@ -351,74 +443,144 @@ const minutes = Math.floor(
     (voice % 3600) / 60
 );
 
-ctx.fillStyle = "#cfd5df";
+// Argent
+
+ctx.drawImage(
+    moneyIcon,
+    60,
+    340,
+    30,
+    30
+);
+
+ctx.fillStyle = "#aab4c3";
 ctx.font = "22px Poppins";
-
-ctx.drawImage(moneyIcon, 38, 338, 26, 26);
-ctx.drawImage(bankIcon,38,405,26,26);
-
-ctx.drawImage(messageIcon,38,472,26,26);
-
-ctx.drawImage(micIcon,520,338,26,26);
-
-ctx.drawImage(calendarIcon,520,405,26,26);
-
-// Colonne gauche
-
-ctx.fillText("Argent",80,360);
-ctx.fillText("Banque",80,427);
-ctx.fillText("Messages",80,494);
-
-ctx.fillText("Vocal",560,360);
-ctx.fillText("Arrivé",560,427);
+ctx.fillText("Argent", 105, 364);
 
 ctx.fillStyle = "white";
 ctx.font = "bold 24px Poppins";
-
-ctx.fillText(`${data.money.toLocaleString()} $`, 250, 360);
-
-ctx.fillText(`${data.bank.toLocaleString()} $`, 250, 430);
-
-ctx.fillText(`${data.messages.toLocaleString()}`, 250, 500);
-
-ctx.fillText(`${hours}h ${minutes}m`, 720, 360);
-
 ctx.fillText(
-    member.joinedAt.toLocaleDateString("fr-FR"),
-    720,
-    430
+    `${data.money.toLocaleString()} $`,
+    250,
+    364
 );
 
+// Banque
+
+ctx.drawImage(
+    bankIcon,
+    60,
+    410,
+    30,
+    30
+);
+
+ctx.fillStyle = "#aab4c3";
+ctx.font = "22px Poppins";
+ctx.fillText("Banque", 105, 434);
+
 ctx.fillStyle = "white";
+ctx.font = "bold 24px Poppins";
+ctx.fillText(
+    `${data.bank.toLocaleString()} $`,
+    250,
+    434
+);
 
-ctx.font = "20px Poppins";
+// Messages
 
+ctx.drawImage(
+    messageIcon,
+    60,
+    480,
+    30,
+    30
+);
 
-                const attachment = new AttachmentBuilder(
-                        await canvas.encode("png"),
-                        {
-                            name: "profil.png"
-                        }
-                    );
+ctx.fillStyle = "#aab4c3";
+ctx.font = "22px Poppins";
+ctx.fillText("Messages", 105, 504);
 
-                        interaction.reply({
+ctx.fillStyle = "white";
+ctx.font = "bold 24px Poppins";
+ctx.fillText(
+    `${data.messages.toLocaleString()}`,
+    250,
+    504
+);
 
-                            files: [
+// Vocal
 
-                                attachment
+ctx.drawImage(
+    micIcon,
+    560,
+    340,
+    30,
+    30
+);
 
-                            ]
+ctx.fillStyle = "#aab4c3";
+ctx.font = "22px Poppins";
+ctx.fillText("Vocal", 605, 364);
 
-                        });
+ctx.fillStyle = "white";
+ctx.font = "bold 24px Poppins";
+ctx.fillText(
+    `${hours}h ${minutes}m`,
+    760,
+    364
+);
 
-                    }
+// Arrivée
 
-                );
+ctx.drawImage(
+    calendarIcon,
+    560,
+    410,
+    30,
+    30
+);
 
-            }
+ctx.fillStyle = "#aab4c3";
+ctx.font = "22px Poppins";
+ctx.fillText("Arrivé", 605, 434);
 
-        );
+ctx.fillStyle = "white";
+ctx.font = "bold 24px Poppins";
+ctx.fillText(
+    member.joinedAt.toLocaleDateString("fr-FR"),
+    760,
+    434
+);
 
-    }
+// ==========================
+// ENVOI
+// ==========================
+
+const attachment =
+    new AttachmentBuilder(
+        await canvas.encode("png"),
+        {
+            name: "profil.png"
+        }
+    );
+
+await interaction.reply({
+
+    files: [
+        attachment
+    ]
+
+});
+
+                }
+
+            );
+
+        }
+
+    );
+
+}
 
 };
