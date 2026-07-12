@@ -482,7 +482,7 @@ ctx.fillText("Banque", 105, 434);
 ctx.fillStyle = "white";
 ctx.font = "bold 24px Poppins";
 ctx.fillText(
-    `${data.bank.toLocaleString()} $`,
+    `${(data.bank || 0).toLocaleString()} $`,
     250,
     434
 );
@@ -573,14 +573,10 @@ await interaction.reply({
 
 });
 
-                }
+                    });
 
-            );
+            });
 
-        }
-
-    );
-
-}
+    }
 
 };
