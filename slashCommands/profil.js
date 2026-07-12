@@ -504,7 +504,7 @@ ctx.fillText("Messages", 105, 504);
 ctx.fillStyle = "white";
 ctx.font = "bold 24px Poppins";
 ctx.fillText(
-    `${data.messages.toLocaleString()}`,
+    `${(data.messages || 0).toLocaleString()}`,
     250,
     504
 );
