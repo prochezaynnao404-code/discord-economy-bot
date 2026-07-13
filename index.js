@@ -65,10 +65,10 @@ client.commands =
 // DATABASE
 // =========================
 
-console.log("Database path:", "/data/database.sqlite");
+console.log("Database path:", "./database.sqlite");
 
 const db = new sqlite3.Database(
-    "/data/database.sqlite"
+    "./database.sqlite"
 );
 
 client.db = db;
