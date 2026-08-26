@@ -38,6 +38,10 @@ const {
 
 const path = require("path");
 
+const {
+    setupAntiNuke
+} = require("./security/antiNuke");
+
 // =========================
 // CLIENT
 // =========================
@@ -60,6 +64,13 @@ const client = new Client({
 
 client.commands =
     new Collection();
+
+// =========================
+// ANTI-NUKE
+// =========================
+
+setupAntiNuke(client);
+
 
 // =========================
 // DATABASE
