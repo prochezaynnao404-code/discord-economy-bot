@@ -142,19 +142,20 @@ module.exports = {
                 });
 
             } catch (error) {
+                console.error("❌ ERREUR SECURITY BACKUP :", error);
 
-                console.error(
-                    "Erreur backup :",
-                    error
-                );
+                const message = error?.message || "Erreur inconnue";
 
-                return interaction.editReply({
+                if (interaction.replied || interaction.deferred) {
+                    return interaction.editReply({
+                        content: `❌ Impossible de créer la sauvegarde.\n\`\`\`\n${message}\n\`\`\``
+                    });
+                }
 
-                    content:
-                        "❌ Impossible de créer la sauvegarde."
-
+                return interaction.reply({
+                    content: `❌ Impossible de créer la sauvegarde.\n\`\`\`\n${message}\n\`\`\``,
+                    ephemeral: true
                 });
-
             }
 
         }
