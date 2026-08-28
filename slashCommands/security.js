@@ -19,9 +19,7 @@ module.exports = {
             "Gestion de la sécurité du serveur"
         )
 
-        .setDefaultMemberPermissions(
-            PermissionFlagsBits.Administrator
-        )
+        .setDefaultMemberPermissions(0)
 
         .addSubcommand(
             subcommand =>
@@ -53,22 +51,14 @@ module.exports = {
         ================================
         */
 
-        if (
-            !interaction.memberPermissions.has(
-                PermissionFlagsBits.Administrator
-            )
-        ) {
+        const OWNER_ID = "1184567704133324891";
 
-            return interaction.reply({
-
-                content:
-                    "❌ Tu dois être administrateur.",
-
-                ephemeral: true
-
-            });
-
-        }
+if (interaction.user.id !== OWNER_ID) {
+    return interaction.reply({
+        content: "❌ Tu n'as pas accès aux commandes de sécurité d'Irisiabot.",
+        ephemeral: true
+    });
+}
 
         const subcommand =
             interaction.options.getSubcommand();
