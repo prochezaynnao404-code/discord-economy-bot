@@ -1,51 +1,41 @@
 const {
-    AuditLogEvent,
-    PermissionFlagsBits
+    AuditLogEvent
 } = require("discord.js");
 
 /*
 ==================================================
-IRISIABOT ANTI-NUKE
+IRISIABOT ANTI-NUKE V2
 ==================================================
 */
 
 const OWNER_ID = "1184567704133324891";
 
-/*
-==================================================
-CONFIGURATION
-==================================================
-*/
-
 const CONFIG = {
 
-    // Nombre maximum d'actions autorisées
-    // pendant la fenêtre de temps.
-
+    // Fenêtre pendant laquelle les actions sont comptées
     WINDOW: 10000,
 
+    // Nombre maximum d'actions dans la fenêtre
     LIMITS: {
 
-        CHANNEL_DELETE: 3,
+        [AuditLogEvent.ChannelDelete]: 3,
 
-        CHANNEL_CREATE: 5,
+        [AuditLogEvent.ChannelCreate]: 5,
 
-        ROLE_DELETE: 3,
+        [AuditLogEvent.RoleDelete]: 3,
 
-        ROLE_CREATE: 5,
+        [AuditLogEvent.RoleCreate]: 5,
 
-        MEMBER_BAN_ADD: 3,
+        [AuditLogEvent.MemberBanAdd]: 3,
 
-        MEMBER_KICK: 3
+        [AuditLogEvent.MemberKick]: 3
 
     },
 
-    // Sanction de l'attaquant
-
+    // Sanction
     PUNISHMENT: "ban",
 
-    // Active le verrouillage après détection
-
+    // Verrouillage du serveur
     LOCKDOWN: true
 
 };
@@ -60,11 +50,23 @@ const actions = new Map();
 
 /*
 ==================================================
+ENTRÉES D'AUDIT LOG DÉJÀ TRAITÉES
+==================================================
+*/
+
+const processedEntries = new Set();
+
+/*
+==================================================
 UTILITAIRE
 ==================================================
 */
 
-function getKey(guildId, executorId, action) {
+function getKey(
+    guildId,
+    executorId,
+    action
+) {
 
     return `${guildId}:${executorId}:${action}`;
 
@@ -72,7 +74,7 @@ function getKey(guildId, executorId, action) {
 
 /*
 ==================================================
-COMPTER UNE ACTION
+ENREGISTRER UNE ACTION
 ==================================================
 */
 
@@ -158,7 +160,7 @@ async function lockdown(guild) {
         } catch (error) {
 
             console.log(
-                `⚠️ Impossible de verrouiller ${channel.name}:`,
+                `⚠️ Lockdown impossible pour ${channel.name}:`,
                 error.message
             );
 
@@ -180,15 +182,24 @@ async function punish(
     reason
 ) {
 
-    // NE JAMAIS sanctionner le propriétaire
+    // Protection du propriétaire
     if (
         executorId === OWNER_ID ||
         executorId === guild.ownerId
     ) {
 
         console.log(
-            `👑 Action ignorée : propriétaire ${executorId}`
+            `👑 Action ignorée pour le propriétaire : ${executorId}`
         );
+
+        return;
+
+    }
+
+    // Protection d'Irisiabot
+    if (
+        executorId === guild.client.user.id
+    ) {
 
         return;
 
@@ -203,10 +214,11 @@ async function punish(
                 executorId
             );
 
-    } catch {
+    } catch (error) {
 
         console.log(
-            `⚠️ Impossible de récupérer ${executorId}`
+            `⚠️ Impossible de récupérer ${executorId}:`,
+            error.message
         );
 
         return;
@@ -223,17 +235,16 @@ async function punish(
 
     /*
     ==============================================
-    BOT / ATTAQUANT HORS HIÉRARCHIE
+    LE BOT NE PEUT PAS AGIR
     ==============================================
     */
 
     if (
-        !executor.kickable &&
         !executor.bannable
     ) {
 
         console.log(
-            `❌ Irisiabot ne peut pas sanctionner ${executor.user.tag}`
+            `❌ Irisiabot ne peut pas bannir ${executor.user.tag}`
         );
 
         await lockdown(guild);
@@ -249,8 +260,7 @@ async function punish(
     */
 
     if (
-        CONFIG.PUNISHMENT === "ban" &&
-        executor.bannable
+        CONFIG.PUNISHMENT === "ban"
     ) {
 
         try {
@@ -271,7 +281,7 @@ async function punish(
         } catch (error) {
 
             console.log(
-                "❌ Erreur ban :",
+                "❌ Erreur lors du ban :",
                 error.message
             );
 
@@ -291,7 +301,7 @@ async function punish(
 
 /*
 ==================================================
-VÉRIFIER LES AUDIT LOGS
+VÉRIFIER L'AUDIT LOG
 ==================================================
 */
 
@@ -307,88 +317,143 @@ async function checkAuditLog(
 
                 type: action,
 
-                limit: 5
+                limit: 10
 
             });
 
-        const entry =
-            logs.entries.first();
+        for (
+            const entry
+            of logs.entries.values()
+        ) {
 
-        if (!entry) {
-            return;
+            /*
+            ======================================
+            IGNORER LES ENTRÉES DÉJÀ TRAITÉES
+            ======================================
+            */
+
+            if (
+                processedEntries.has(entry.id)
+            ) {
+
+                continue;
+
+            }
+
+            /*
+            ======================================
+            IGNORER LES ACTIONS TROP ANCIENNES
+            ======================================
+            */
+
+            if (
+                Date.now() -
+                entry.createdTimestamp >
+                10000
+            ) {
+
+                processedEntries.add(
+                    entry.id
+                );
+
+                continue;
+
+            }
+
+            /*
+            ======================================
+            MARQUER COMME TRAITÉE
+            ======================================
+            */
+
+            processedEntries.add(
+                entry.id
+            );
+
+            const executorId =
+                entry.executorId;
+
+            if (!executorId) {
+                continue;
+            }
+
+            /*
+            ======================================
+            IGNORER IRISIABOT
+            ======================================
+            */
+
+            if (
+                executorId ===
+                guild.client.user.id
+            ) {
+
+                continue;
+
+            }
+
+            /*
+            ======================================
+            COMPTER L'ACTION
+            ======================================
+            */
+
+            const count =
+                registerAction(
+                    guild,
+                    executorId,
+                    action
+                );
+
+            const limit =
+                CONFIG.LIMITS[action];
+
+            console.log(
+                `🛡️ Action ${action} : ${count}/${limit}`
+            );
+
+            /*
+            ======================================
+            DÉTECTION NUKE
+            ======================================
+            */
+
+            if (
+                count >= limit
+            ) {
+
+                await punish(
+
+                    guild,
+
+                    executorId,
+
+                    `${count} actions dangereuses détectées`
+
+                );
+
+            }
+
         }
 
         /*
         ==========================================
-        IGNORER LES VIEILLES ACTIONS
+        NETTOYAGE
         ==========================================
         */
 
         if (
-            Date.now() -
-            entry.createdTimestamp >
-            5000
+            processedEntries.size > 1000
         ) {
 
-            return;
-
-        }
-
-        const executorId =
-            entry.executorId;
-
-        if (!executorId) {
-            return;
-        }
-
-        /*
-        ==========================================
-        IGNORER IRISIABOT
-        ==========================================
-        */
-
-        if (
-            executorId === guild.client.user.id
-        ) {
-
-            return;
-
-        }
-
-        const actionCount =
-            registerAction(
-                guild,
-                executorId,
-                action
-            );
-
-        const limit =
-            CONFIG.LIMITS[action];
-
-        console.log(
-            `🛡️ ${action} : ${actionCount}/${limit}`
-        );
-
-        if (
-            actionCount >= limit
-        ) {
-
-            await punish(
-
-                guild,
-
-                executorId,
-
-                `${actionCount} actions ${action} en ${CONFIG.WINDOW / 1000}s`
-
-            );
+            processedEntries.clear();
 
         }
 
     } catch (error) {
 
         console.log(
-            `⚠️ Audit Log ${action} :`,
+            `⚠️ Erreur Audit Log ${action}:`,
             error.message
         );
 
@@ -398,14 +463,14 @@ async function checkAuditLog(
 
 /*
 ==================================================
-SURVEILLANCE
+DÉMARRER L'ANTI-NUKE
 ==================================================
 */
 
 function startAntiNuke(client) {
 
     console.log(
-        "🛡️ Irisiabot Anti-Nuke activé"
+        "🛡️ Irisiabot Anti-Nuke V2 activé"
     );
 
     setInterval(
@@ -457,32 +522,35 @@ function startAntiNuke(client) {
 
 /*
 ==================================================
-PROTECTION AJOUT DE BOTS
+PROTECTION CONTRE L'AJOUT DE BOTS
 ==================================================
 */
 
 function startBotProtection(client) {
 
+    console.log(
+        "🤖 Protection des bots activée"
+    );
+
     client.on(
         "guildMemberAdd",
+
         async member => {
 
-            if (!member.user.bot) {
+            if (
+                !member.user.bot
+            ) {
+
                 return;
+
             }
 
             const guild =
                 member.guild;
 
             console.log(
-                `🤖 Nouveau bot détecté : ${member.user.tag}`
+                `🤖 Nouveau bot : ${member.user.tag}`
             );
-
-            /*
-            ======================================
-            RÉCUPÉRER QUI A AJOUTÉ LE BOT
-            ======================================
-            */
 
             try {
 
@@ -503,6 +571,12 @@ function startBotProtection(client) {
                     return;
                 }
 
+                /*
+                ==================================
+                ACTION TROP ANCIENNE
+                ==================================
+                */
+
                 if (
                     Date.now() -
                     entry.createdTimestamp >
@@ -520,6 +594,12 @@ function startBotProtection(client) {
                     return;
                 }
 
+                /*
+                ==================================
+                IGNORER PROPRIÉTAIRE
+                ==================================
+                */
+
                 if (
                     executorId === OWNER_ID ||
                     executorId === guild.ownerId ||
@@ -532,18 +612,20 @@ function startBotProtection(client) {
 
                 /*
                 ==================================
-                SUPPRIMER LE BOT AJOUTÉ
+                SUPPRIMER LE BOT
                 ==================================
                 */
 
-                if (member.bannable) {
+                if (
+                    member.bannable
+                ) {
 
                     await member.ban({
 
                         deleteMessageSeconds: 0,
 
                         reason:
-                            "Irisiabot Anti-Nuke : bot ajouté par un utilisateur non autorisé"
+                            "Irisiabot Anti-Nuke : bot ajouté sans autorisation"
 
                     });
 
@@ -572,13 +654,14 @@ function startBotProtection(client) {
             } catch (error) {
 
                 console.log(
-                    "⚠️ Erreur protection bots :",
+                    "⚠️ Erreur protection bot :",
                     error.message
                 );
 
             }
 
         }
+
     );
 
 }
@@ -590,8 +673,13 @@ EXPORT
 */
 
 module.exports = {
+
     startAntiNuke,
+
     startBotProtection,
+
     lockdown,
+
     CONFIG
+
 };
