@@ -70,7 +70,8 @@ client.commands =
 // ANTI-NUKE
 // =========================
 
-setupAntiNuke(client);
+startAntiNuke(client);
+startBotProtection(client);
 
 
 // =========================
