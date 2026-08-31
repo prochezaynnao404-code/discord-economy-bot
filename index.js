@@ -12,7 +12,12 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle
-} = require("discord.js");
+} = require("discord.js"); 
+
+const {
+    startAntiNuke,
+    startBotProtection
+} = require("./security/antiNuke");
 
 const express = require("express");
 const app = express();
@@ -868,6 +873,14 @@ client.on("voiceStateUpdate", (oldState, newState) => {
         );
     }
 });
+
+// =========================
+// SECURITY
+// =========================
+
+startAntiNuke(client);
+
+startBotProtection(client);
 
 // =========================
 // LOGIN
