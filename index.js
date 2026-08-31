@@ -14,11 +14,6 @@ const {
     ButtonStyle
 } = require("discord.js"); 
 
-const {
-    startAntiNuke,
-    startBotProtection
-} = require("./security/antiNuke");
-
 const express = require("express");
 const app = express();
 
@@ -44,7 +39,8 @@ const {
 const path = require("path");
 
 const {
-    setupAntiNuke
+    startAntiNuke,
+    startBotProtection
 } = require("./security/antiNuke");
 
 // =========================
@@ -879,7 +875,6 @@ client.on("voiceStateUpdate", (oldState, newState) => {
 // =========================
 
 startAntiNuke(client);
-
 startBotProtection(client);
 
 // =========================

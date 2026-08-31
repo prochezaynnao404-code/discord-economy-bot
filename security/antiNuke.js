@@ -590,13 +590,8 @@ EXPORT
 */
 
 module.exports = {
-
     startAntiNuke,
-
     startBotProtection,
-
     lockdown,
-
     CONFIG
-
 };
