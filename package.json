@@ -17,6 +17,8 @@
     "dependencies": {
         "@napi-rs/canvas": "^1.0.2",
         "better-sqlite3": "^13.2.0",
+        "chess.js": "^1.4.0",
+        "dejavu-fonts-ttf": "^2.37.3",
         "discord.js": "^14.27.0",
         "dotenv": "^17.2.1",
         "express": "^5.2.1"

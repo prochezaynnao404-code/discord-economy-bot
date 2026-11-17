@@ -14,9 +14,6 @@ module.exports = {
     // Membres de confiance ignorés par l'anti-nuke (séparés par des virgules)
     SECURITY_WHITELIST: idList(process.env.SECURITY_WHITELIST),
 
-    // Salon où l'anti-nuke envoie ses alertes (optionnel)
-    SECURITY_LOG_CHANNEL_ID: process.env.SECURITY_LOG_CHANNEL_ID || null,
-
     // Base de données SQLite
     DB_PATH: process.env.DB_PATH || "./database.sqlite",
     BACKUP_DIR: process.env.BACKUP_DIR || "./backups",

@@ -36,7 +36,10 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMembers,
         // Nécessaire pour recevoir les entrées d'audit log en temps réel (anti-nuke)
-        GatewayIntentBits.GuildModeration
+        GatewayIntentBits.GuildModeration,
+        // Anti-nuke : savoir qui a invité chaque membre, et recréer les emojis supprimés
+        GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildExpressions
     ]
 });
 
@@ -68,7 +71,7 @@ console.log(`✅ ${client.commands.size} commandes chargées`);
 // SÉCURITÉ
 // =========================
 
-startAntiNuke(client);
+startAntiNuke(client, economy);
 
 // =========================
 // TEMPS VOCAL (une seule source de vérité)

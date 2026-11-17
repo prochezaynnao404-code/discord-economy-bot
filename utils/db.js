@@ -62,6 +62,22 @@ function migrate(db) {
             amount INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (userId, item)
         );
+        CREATE TABLE IF NOT EXISTS member_joins (
+            guildId TEXT NOT NULL,
+            userId TEXT NOT NULL,
+            inviterId TEXT,
+            code TEXT,
+            joinedAt INTEGER NOT NULL,
+            PRIMARY KEY (guildId, userId)
+        );
+        CREATE TABLE IF NOT EXISTS game_stats (
+            userId TEXT NOT NULL,
+            game TEXT NOT NULL,
+            wins INTEGER NOT NULL DEFAULT 0,
+            losses INTEGER NOT NULL DEFAULT 0,
+            draws INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (userId, game)
+        );
         CREATE INDEX IF NOT EXISTS idx_users_money ON users(money DESC);
         CREATE INDEX IF NOT EXISTS idx_users_level ON users(level DESC, xp DESC);
     `);
@@ -306,6 +322,49 @@ class Economy {
         return this.db
             .prepare("SELECT item, amount FROM inventory WHERE userId = ? AND amount > 0 ORDER BY item")
             .all(userId);
+    }
+
+    // ---------- Mini-jeux ----------
+
+    recordGame(userId, game, outcome) {
+        const column = { win: "wins", loss: "losses", draw: "draws" }[outcome];
+        if (!column) throw new Error(`Résultat invalide : ${outcome}`);
+        this.db
+            .prepare(
+                `INSERT INTO game_stats (userId, game, ${column}) VALUES (?, ?, 1)
+                 ON CONFLICT(userId, game) DO UPDATE SET ${column} = ${column} + 1`
+            )
+            .run(userId, game);
+    }
+
+    getGameStats(userId) {
+        return this.db.prepare("SELECT * FROM game_stats WHERE userId = ? ORDER BY game").all(userId);
+    }
+
+    topGamePlayers(game, limit = 10) {
+        return this.db
+            .prepare("SELECT * FROM game_stats WHERE game = ? AND wins > 0 ORDER BY wins DESC, losses ASC LIMIT ?")
+            .all(game, limit);
+    }
+
+    // ---------- Invitations ----------
+
+    recordJoin(guildId, userId, inviterId, code, joinedAt) {
+        this.db
+            .prepare(
+                `INSERT INTO member_joins (guildId, userId, inviterId, code, joinedAt) VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(guildId, userId) DO UPDATE SET inviterId = excluded.inviterId,
+                 code = excluded.code, joinedAt = excluded.joinedAt`
+            )
+            .run(guildId, userId, inviterId, code, joinedAt);
+    }
+
+    getJoin(guildId, userId) {
+        return (
+            this.db
+                .prepare("SELECT inviterId, code, joinedAt FROM member_joins WHERE guildId = ? AND userId = ?")
+                .get(guildId, userId) || null
+        );
     }
 
     // ---------- Sauvegardes ----------
