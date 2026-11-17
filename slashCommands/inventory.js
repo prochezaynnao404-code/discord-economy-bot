@@ -1,73 +1,15 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 module.exports = {
-
-    data: new SlashCommandBuilder()
-
-        .setName("inventory")
-
-        .setDescription(
-            "Voir inventaire"
-        ),
+    data: new SlashCommandBuilder().setName("inventory").setDescription("Voir ton inventaire"),
 
     async execute(interaction) {
+        const items = interaction.client.economy.getInventory(interaction.user.id);
+        const text =
+            items.length === 0 ? "📦 Inventaire vide." : items.map((i) => `• ${i.item} ×${i.amount}`).join("\n");
 
-        const db =
-            interaction.client.db;
-
-        db.all(
-            `SELECT * FROM inventory
-            WHERE userId = ?`,
-            [interaction.user.id],
-
-            (err, items) => {
-
-                let text =
-                    "";
-
-                if (
-                    items.length === 0
-                ) {
-
-                    text =
-                        "📦 Inventaire vide.";
-
-                } else {
-
-                    items.forEach(
-                        item => {
-
-                            text +=
-`• ${item.item}
-x${item.amount}
-
-`;
-                        }
-                    );
-                }
-
-                const embed =
-                    new EmbedBuilder()
-
-                    .setTitle(
-                        "🎒 Inventaire"
-                    )
-
-                    .setColor(
-                        "Purple"
-                    )
-
-                    .setDescription(
-                        text
-                    );
-
-                interaction.reply({
-                    embeds: [embed]
-                });
-            }
-        );
+        return interaction.reply({
+            embeds: [new EmbedBuilder().setTitle("🎒 Inventaire").setColor("Purple").setDescription(text)]
+        });
     }
 };

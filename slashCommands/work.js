@@ -1,179 +1,74 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
-const jobs = [
+const { ECONOMY } = require("../config");
+const { EPHEMERAL, money, duration, randInt, pick, lockUser, unlockUser } = require("../utils/helpers");
 
-    {
-        name: "🚕 Chauffeur",
-        word: "LIVRAISON"
-    },
-
-    {
-        name: "💻 Développeur",
-        word: "JAVASCRIPT"
-    },
-
-    {
-        name: "👮 Policier",
-        word: "ARRESTATION"
-    },
-
-    {
-        name: "👨‍🍳 Cuisinier",
-        word: "CUISINE"
-    }
+const JOBS = [
+    { name: "🚕 Chauffeur", word: "LIVRAISON" },
+    { name: "💻 Développeur", word: "JAVASCRIPT" },
+    { name: "👮 Policier", word: "ARRESTATION" },
+    { name: "👨‍🍳 Cuisinier", word: "CUISINE" },
+    { name: "🧑‍⚕️ Médecin", word: "ORDONNANCE" },
+    { name: "🧑‍🏫 Professeur", word: "TABLEAU" }
 ];
 
-const cooldowns =
-    new Map();
-
 module.exports = {
-
-    data: new SlashCommandBuilder()
-
-        .setName("work")
-
-        .setDescription(
-            "Travail interactif"
-        ),
+    data: new SlashCommandBuilder().setName("work").setDescription("Travailler (1 fois par heure)"),
 
     async execute(interaction) {
+        const economy = interaction.client.economy;
+        const userId = interaction.user.id;
 
-        const userId =
-            interaction.user.id;
-
-        // =====================
-        // COOLDOWN
-        // =====================
-
-        const cooldown =
-            60 * 60 * 1000;
-
-        if (
-            cooldowns.has(userId)
-        ) {
-
-            const expiration =
-                cooldowns.get(userId)
-                + cooldown;
-
-            if (
-                Date.now()
-                < expiration
-            ) {
-
-                const remaining =
-                    Math.ceil(
-                        (expiration - Date.now())
-                        / 60000
-                    );
-
-                return interaction.reply({
-
-                    content:
-`⏳ Tu dois attendre ${remaining} minutes.`,
-
-                    flags: 64
-                });
-            }
+        if (!interaction.channel) {
+            return interaction.reply({ content: "❌ Commande indisponible ici.", flags: EPHEMERAL });
+        }
+        if (!lockUser(userId)) {
+            return interaction.reply({ content: "❌ Tu es déjà dans un mini-jeu.", flags: EPHEMERAL });
         }
 
-        cooldowns.set(
-            userId,
-            Date.now()
-        );
+        try {
+            // Cooldown stocké en base : il survit aux redémarrages
+            const remaining = economy.tryCooldown(userId, "lastWork", ECONOMY.WORK_COOLDOWN);
+            if (remaining > 0) {
+                return interaction.reply({
+                    content: `⏳ Tu dois attendre **${duration(remaining)}**.`,
+                    flags: EPHEMERAL
+                });
+            }
 
-        const job =
-            jobs[
-                Math.floor(
-                    Math.random()
-                    * jobs.length
-                )
-            ];
+            // Employé d'une entreprise : bonus de 20 %
+            const job = economy.getEmployment(userId);
+            const task = pick(JOBS);
 
-        const embed =
-            new EmbedBuilder()
-
-            .setTitle(
-                "💼 Travail"
-            )
-
-            .setColor(
-                "Blue"
-            )
-
-            .setDescription(
-`${job.name}
-
-Tape rapidement :
-
-${job.word}
-
-⏳ 10 secondes`
-            );
-
-        await interaction.reply({
-            embeds: [embed]
-        });
-
-        const filter =
-            m =>
-                m.author.id
-                === userId;
-
-        const collector =
-            interaction.channel.createMessageCollector({
-
-                filter,
-
-                time: 10000,
-
-                max: 1
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("💼 Travail")
+                        .setColor("Blue")
+                        .setDescription(
+                            `${task.name}${job ? ` chez **${job.name}**` : ""}\n\nTape rapidement :\n\`${task.word}\`\n\n⏳ 10 secondes`
+                        )
+                ]
             });
 
-        collector.on(
-            "collect",
+            const collected = await interaction.channel
+                .awaitMessages({ filter: (m) => m.author.id === userId, max: 1, time: 10000, errors: ["time"] })
+                .catch(() => null);
 
-            msg => {
-
-                const db =
-                    interaction.client.db;
-
-                if (
-                    msg.content.toUpperCase()
-                    === job.word
-                ) {
-
-                    const gain =
-                        Math.floor(
-                            Math.random() * 7500
-                        ) + 4500;
-
-                    db.run(
-                        `UPDATE users
-                        SET money = money + ?
-                        WHERE userId = ?`,
-                        [
-                            gain,
-                            userId
-                        ]
-                    );
-
-                    msg.reply(
-`✅ Travail réussi
-
-💰 +${gain}$`
-                    );
-
-                } else {
-
-                    msg.reply(
-                        "❌ Mauvaise réponse."
-                    );
-                }
+            if (!collected) {
+                return interaction.followUp("⏰ Trop lent, pas de salaire cette fois.");
             }
-        );
+            const msg = collected.first();
+            if (msg.content.trim().toUpperCase() !== task.word) {
+                return msg.reply("❌ Mauvaise réponse, pas de salaire cette fois.");
+            }
+
+            let gain = randInt(...ECONOMY.WORK_GAIN);
+            if (job) gain = Math.floor(gain * 1.2);
+            economy.addMoney(userId, gain);
+            return msg.reply(`✅ Travail réussi\n💰 +${money(gain)}${job ? " (bonus entreprise +20 %)" : ""}`);
+        } finally {
+            unlockUser(userId);
+        }
     }
 };

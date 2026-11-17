@@ -1,206 +1,69 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
-const createUser =
-    require("../utils/createUser");
+const { ECONOMY } = require("../config");
+const { EPHEMERAL, money, randInt } = require("../utils/helpers");
+
+// Roulette européenne : 0 = vert, numéros rouges officiels
+const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const PAYOUT = { rouge: 2, noir: 2, vert: 36 }; // montant rendu (mise comprise)
+const EMOJI = { rouge: "🔴", noir: "⚫", vert: "🟢" };
+
+function colorOf(number) {
+    if (number === 0) return "vert";
+    return RED_NUMBERS.has(number) ? "rouge" : "noir";
+}
 
 module.exports = {
-
     data: new SlashCommandBuilder()
-
         .setName("roulette")
-
-        .setDescription(
-            "Jouer à la roulette"
-        )
-
-        .addStringOption(option =>
-
+        .setDescription("Jouer à la roulette")
+        .addStringOption((option) =>
             option
-
-            .setName("couleur")
-
-            .setDescription(
-                "Rouge ou noir"
-            )
-
-            .setRequired(true)
-
-            .addChoices(
-
-                {
-                    name: "Rouge",
-                    value: "rouge"
-                },
-
-                {
-                    name: "Noir",
-                    value: "noir"
-                }
-            )
+                .setName("couleur")
+                .setDescription("Rouge / noir (x2) ou vert (x36)")
+                .setRequired(true)
+                .addChoices(
+                    { name: "Rouge (x2)", value: "rouge" },
+                    { name: "Noir (x2)", value: "noir" },
+                    { name: "Vert (x36)", value: "vert" }
+                )
         )
-
-        .addIntegerOption(option =>
-
+        .addIntegerOption((option) =>
             option
-
-            .setName("mise")
-
-            .setDescription(
-                "Montant de la mise"
-            )
-
-            .setRequired(true)
+                .setName("mise")
+                .setDescription("Montant de la mise")
+                .setRequired(true)
+                .setMinValue(1)
+                .setMaxValue(ECONOMY.MAX_BET)
         ),
 
     async execute(interaction) {
+        const economy = interaction.client.economy;
+        const userId = interaction.user.id;
+        const color = interaction.options.getString("couleur");
+        const bet = interaction.options.getInteger("mise");
 
-        const db =
-            interaction.client.db;
-
-        const color =
-            interaction.options.getString(
-                "couleur"
-            );
-
-        const bet =
-            interaction.options.getInteger(
-                "mise"
-            );
-
-        // =====================
-        // CHECK NEGATIVE
-        // =====================
-
-        if (bet <= 0) {
-
-            return interaction.reply({
-
-                content:
-                    "❌ Mise invalide.",
-
-                flags: 64
-            });
+        if (!economy.takeMoney(userId, bet)) {
+            return interaction.reply({ content: "❌ Pas assez d'argent.", flags: EPHEMERAL });
         }
 
-        createUser(
-            db,
-            interaction.user.id,
+        const number = randInt(0, 36);
+        const result = colorOf(number);
+        const won = result === color;
 
-            () => {
+        if (won) economy.addMoney(userId, bet * PAYOUT[color]);
+        economy.progressQuest(userId, "casino");
 
-                db.get(
-                    "SELECT * FROM users WHERE userId = ?",
-                    [interaction.user.id],
+        const embed = new EmbedBuilder()
+            .setTitle("🎰 Roulette")
+            .setColor(won ? "Green" : "Red")
+            .setDescription(
+                `🎯 Résultat : ${EMOJI[result]} **${number}** (${result})\n\n` +
+                    (won
+                        ? `✅ Tu as gagné **${money(bet * PAYOUT[color] - bet)}**`
+                        : `❌ Tu as perdu **${money(bet)}**`)
+            );
 
-                    (err, row) => {
-
-                        if (!row) return;
-
-                        // =====================
-                        // NOT ENOUGH MONEY
-                        // =====================
-
-                        if (
-                            row.money < bet
-                        ) {
-
-                            return interaction.reply({
-
-                                content:
-                                    "❌ Pas assez d'argent.",
-
-                                flags: 64
-                            });
-                        }
-
-                        const result =
-                            Math.random() < 0.5
-                            ? "rouge"
-                            : "noir";
-
-                        // =====================
-                        // WIN
-                        // =====================
-
-                        if (
-                            result === color
-                        ) {
-
-                            const gain =
-                                bet;
-
-                            db.run(
-                                `UPDATE users
-                                SET money = money + ?
-                                WHERE userId = ?`,
-                                [
-                                    gain,
-                                    interaction.user.id
-                                ]
-                            );
-
-                            const embed =
-                                new EmbedBuilder()
-
-                                .setTitle(
-                                    "🎰 Roulette"
-                                )
-
-                                .setColor(
-                                    "Green"
-                                )
-
-                                .setDescription(
-`🎯 Résultat : ${result}
-
-✅ Tu as gagné ${gain}$`
-                                );
-
-                            return interaction.reply({
-                                embeds: [embed]
-                            });
-                        }
-
-                        // =====================
-                        // LOSE
-                        // =====================
-
-                        db.run(
-                            `UPDATE users
-                            SET money = money - ?
-                            WHERE userId = ?`,
-                            [
-                                bet,
-                                interaction.user.id
-                            ]
-                        );
-
-                        const embed =
-                            new EmbedBuilder()
-
-                            .setTitle(
-                                "🎰 Roulette"
-                            )
-
-                            .setColor(
-                                "Red"
-                            )
-
-                            .setDescription(
-`🎯 Résultat : ${result}
-
-❌ Tu as perdu ${bet}$`
-                            );
-
-                         interaction.reply({
-                            embeds: [embed]
-                        });
-                    }
-                );
-            }
-        );
+        return interaction.reply({ embeds: [embed] });
     }
 };

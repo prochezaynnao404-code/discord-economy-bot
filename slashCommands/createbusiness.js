@@ -1,80 +1,38 @@
-const {
-    SlashCommandBuilder
-} = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 
-const createUser =
-    require("../utils/createUser");
+const { ECONOMY } = require("../config");
+const { EPHEMERAL, money } = require("../utils/helpers");
 
 module.exports = {
-
     data: new SlashCommandBuilder()
         .setName("createbusiness")
-        .setDescription(
-            "Créer une entreprise"
-        )
-        .addStringOption(option =>
+        .setDescription(`Créer une entreprise (${ECONOMY.BUSINESS_PRICE.toLocaleString("fr-FR")} $)`)
+        .addStringOption((option) =>
             option
-            .setName("nom")
-            .setDescription("Nom entreprise")
-            .setRequired(true)
+                .setName("nom")
+                .setDescription("Nom de l'entreprise")
+                .setRequired(true)
+                .setMinLength(2)
+                .setMaxLength(40)
         ),
 
     async execute(interaction) {
+        const name = interaction.options.getString("nom").trim();
+        const status = interaction.client.economy.createBusiness(interaction.user.id, name, ECONOMY.BUSINESS_PRICE);
 
-        const db = interaction.client.db;
+        if (status === "exists") {
+            return interaction.reply({ content: "❌ Tu possèdes déjà une entreprise.", flags: EPHEMERAL });
+        }
+        if (status === "money") {
+            return interaction.reply({
+                content: `❌ Il te faut ${money(ECONOMY.BUSINESS_PRICE)} en poche.`,
+                flags: EPHEMERAL
+            });
+        }
 
-        const name =
-            interaction.options.getString(
-                "nom"
-            );
-
-        createUser(
-            db,
-            interaction.user.id,
-            () => {
-
-                db.get(
-                    "SELECT * FROM users WHERE userId = ?",
-                    [interaction.user.id],
-                    (err, row) => {
-
-                        const price = 5000000;
-
-                        if (
-                            row.money < price
-                        ) {
-
-                            return interaction.reply(
-                                "❌ Il faut 5000000$."
-                            );
-                        }
-
-                        db.run(
-                            "UPDATE users SET money = money - ? WHERE userId = ?",
-                            [
-                                price,
-                                interaction.user.id
-                            ]
-                        );
-
-                        db.run(
-                            `INSERT INTO businesses
-                            (ownerId, name)
-                            VALUES (?, ?)`,
-                            [
-                                interaction.user.id,
-                                name
-                            ]
-                        );
-
-                        interaction.reply(
-`🏢 Entreprise créée
-
-Nom : ${name}`
-                        );
-                    }
-                );
-            }
-        );
+        return interaction.reply({
+            content: `🏢 Entreprise **${name}** créée !\nRecrute avec \`/hire\` : tes employés gagnent +20 % avec \`/work\`.`,
+            allowedMentions: { parse: [] }
+        });
     }
 };

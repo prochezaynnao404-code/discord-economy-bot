@@ -1,174 +1,41 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+
+const { ECONOMY } = require("../config");
+const { EPHEMERAL, money, duration } = require("../utils/helpers");
 
 module.exports = {
-
-    data: new SlashCommandBuilder()
-
-        .setName("daily")
-
-        .setDescription(
-            "Récupère ton daily"
-        ),
+    data: new SlashCommandBuilder().setName("daily").setDescription("Récupère ton daily"),
 
     async execute(interaction) {
+        const result = interaction.client.economy.claimDaily(interaction.user.id, {
+            reward: ECONOMY.DAILY_REWARD,
+            streakMax: ECONOMY.DAILY_STREAK_MAX,
+            cooldown: 24 * 60 * 60 * 1000
+        });
 
-        const db =
-            interaction.client.db;
+        if (!result.ok) {
+            return interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor("Red")
+                        .setTitle("⏳ DAILY")
+                        .setDescription(`Reviens dans **${duration(result.remaining)}**`)
+                ],
+                flags: EPHEMERAL
+            });
+        }
 
-        const userId =
-            interaction.user.id;
-
-        db.get(
-            "SELECT * FROM users WHERE userId = ?",
-            [userId],
-
-            (err, user) => {
-
-                if (!user) {
-
-                    db.run(
-                        `
-                        INSERT INTO users (
-                            userId
-                        )
-                        VALUES (?)
-                        `,
-                        [userId]
-                    );
-
-                    return interaction.reply({
-
-                        content:
-                            "Réessaie la commande.",
-
-                        flags: 64
-                    });
-                }
-
-                const now =
-                    Date.now();
-
-                const cooldown =
-                    86400000;
-
-                // COOLDOWN
-
-                if (
-                    user.lastDaily
-                    && now - user.lastDaily
-                    < cooldown
-                ) {
-
-                    const timeLeft =
-                        cooldown -
-                        (
-                            now
-                            - user.lastDaily
-                        );
-
-                    const hours =
-                        Math.floor(
-                            timeLeft / 3600000
-                        );
-
-                    const minutes =
-                        Math.floor(
-                            (
-                                timeLeft
-                                % 3600000
-                            ) / 60000
-                        );
-
-                    return interaction.reply({
-
-                        embeds: [
-
-                            new EmbedBuilder()
-
-                            .setColor("Red")
-
-                            .setTitle(
-                                "⏳ DAILY"
-                            )
-
-                            .setDescription(
-`Reviens dans
-${hours}h ${minutes}m`
-                            )
-                        ],
-
-                        flags: 64
-                    });
-                }
-
-                // STREAK
-
-                let streak =
-                    (
-                        user.dailyStreak
-                        || 0
-                    ) + 1;
-
-                let reward =
-                    5000;
-
-                // BONUS X2
-
-                if (
-                    streak >= 10
-                ) {
-
-                    reward *= 2;
-
-                    streak = 0;
-                }
-
-                const newMoney =
-                    user.money + reward;
-
-                db.run(
-                    `
-                    UPDATE users
-
-                    SET money = ?,
-                    lastDaily = ?,
-                    dailyStreak = ?
-
-                    WHERE userId = ?
-                    `,
-                    [
-                        newMoney,
-                        now,
-                        streak,
-                        userId
-                    ]
-                );
-
-                interaction.reply({
-
-                    embeds: [
-
-                        new EmbedBuilder()
-
-                        .setColor("Green")
-
-                        .setTitle(
-                            "🎁 DAILY"
-                        )
-
-                        .setDescription(
-`💰 Gain :
-${reward}$
-
-🔥 Série :
-${streak}/10`
-                        )
-                    ]
-                });
-            }
-        );
+        return interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor("Green")
+                    .setTitle("🎁 DAILY")
+                    .setDescription(
+                        `💰 Gain : **${money(result.gain)}**${result.bonus ? " (bonus x2 !)" : ""}\n` +
+                            `🔥 Série : **${result.streak}/${ECONOMY.DAILY_STREAK_MAX}**\n\n` +
+                            "_La série repart à zéro si tu rates plus d'un jour._"
+                    )
+            ]
+        });
     }
 };

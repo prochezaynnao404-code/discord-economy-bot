@@ -1,92 +1,29 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
-const createUser =
-    require("../utils/createUser");
+const { money } = require("../utils/helpers");
 
 module.exports = {
-
     data: new SlashCommandBuilder()
-
         .setName("balance")
-
-        .setDescription(
-            "Voir son argent"
-        ),
+        .setDescription("Voir son argent")
+        .addUserOption((option) => option.setName("joueur").setDescription("Voir le solde d'un autre joueur")),
 
     async execute(interaction) {
+        const target = interaction.options.getUser("joueur") || interaction.user;
+        const row = interaction.client.economy.getUser(target.id);
 
-        const db =
-            interaction.client.db;
-
-        createUser(
-            db,
-            interaction.user.id,
-
-            () => {
-
-                db.get(
-                    "SELECT * FROM users WHERE userId = ?",
-                    [interaction.user.id],
-
-                    (err, row) => {
-
-                        const embed =
-                            new EmbedBuilder()
-
-                            .setTitle(
-                                "💰 Balance"
-                            )
-
-                            .setColor(
-                                "#00ff99"
-                            )
-
-                            .setThumbnail(
-interaction.user.displayAvatarURL()
-                            )
-
-                            .addFields(
-
-                                {
-                                    name:
-                                        "💵 Argent",
-
-                                    value:
-`${row.money}$`,
-
-                                    inline: true
-                                },
-
-                                {
-                                    name:
-                                        "🏦 Banque",
-
-                                    value:
-`${row.bank}$`,
-
-                                    inline: true
-                                },
-
-                                {
-                                    name:
-                                        "⭐ Niveau",
-
-                                    value:
-`${row.level}`,
-
-                                    inline: true
-                                }
-                            );
-
-                        interaction.reply({
-                            embeds: [embed]
-                        });
-                    }
-                );
-            }
-        );
+        return interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(`💰 Balance de ${target.username}`)
+                    .setColor("#00ff99")
+                    .setThumbnail(target.displayAvatarURL())
+                    .addFields(
+                        { name: "💵 Argent", value: money(row.money), inline: true },
+                        { name: "🏦 Banque", value: money(row.bank), inline: true },
+                        { name: "⭐ Niveau", value: String(row.level), inline: true }
+                    )
+            ]
+        });
     }
 };

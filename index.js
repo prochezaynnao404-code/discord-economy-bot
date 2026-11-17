@@ -1,967 +1,278 @@
 require("dotenv").config();
 
-console.log("🚀 BOT STARTING...");
-
 const fs = require("fs");
-
-const {
-    Client,
-    Collection,
-    GatewayIntentBits,
-    Events,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
-} = require("discord.js"); 
-
-const express = require("express");
-const app = express();
-
-app.get("/", (req, res) => {
-  res.status(200).send("Bot Discord OK");
-});
-
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, "0.0.0.0", () => {
-    console.log("🌐 LISTEN CALLED");
-  console.log("🌐 Web server ON port:", PORT);
-});
-
-const sqlite3 =
-    require("sqlite3").verbose();
-
-const {
-    createCanvas,
-    loadImage
-} = require("@napi-rs/canvas");
-
 const path = require("path");
+const express = require("express");
+const { Client, Collection, GatewayIntentBits, Events } = require("discord.js");
 
-const {
-    startAntiNuke,
-    startBotProtection
-} = require("./security/antiNuke");
+const config = require("./config");
+const { Economy } = require("./utils/db");
+const { EPHEMERAL, randInt } = require("./utils/helpers");
+const { startAntiNuke } = require("./security/antiNuke");
+
+const ECO = config.ECONOMY;
+
+console.log("🚀 Démarrage du bot...");
+
+// =========================
+// SERVEUR WEB (health check de l'hébergeur)
+// =========================
+
+const app = express();
+app.get("/", (req, res) => res.status(200).send("Bot Discord OK"));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, "0.0.0.0", () => console.log(`🌐 Serveur web sur le port ${PORT}`));
 
 // =========================
 // CLIENT
 // =========================
 
 const client = new Client({
-
     intents: [
-
         GatewayIntentBits.Guilds,
-
         GatewayIntentBits.GuildMessages,
-
+        // Nécessaire pour les mini-jeux où il faut retaper un mot (/work, /rob)
         GatewayIntentBits.MessageContent,
-
         GatewayIntentBits.GuildVoiceStates,
-
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        // Nécessaire pour recevoir les entrées d'audit log en temps réel (anti-nuke)
+        GatewayIntentBits.GuildModeration
     ]
 });
 
-client.commands =
-    new Collection();
+// =========================
+// BASE DE DONNÉES
+// =========================
+
+const economy = new Economy(config.DB_PATH);
+client.economy = economy;
+console.log(`🗄️ Base de données : ${path.resolve(config.DB_PATH)}`);
 
 // =========================
-// ANTI-NUKE
+// COMMANDES
+// =========================
+
+client.commands = new Collection();
+
+for (const file of fs.readdirSync(path.join(__dirname, "slashCommands")).filter((f) => f.endsWith(".js"))) {
+    const command = require(`./slashCommands/${file}`);
+    if (!command.data || !command.execute) {
+        console.warn(`❌ Commande invalide : ${file}`);
+        continue;
+    }
+    client.commands.set(command.data.name, command);
+}
+console.log(`✅ ${client.commands.size} commandes chargées`);
+
+// =========================
+// SÉCURITÉ
 // =========================
 
 startAntiNuke(client);
-startBotProtection(client);
-
 
 // =========================
-// DATABASE
+// TEMPS VOCAL (une seule source de vérité)
 // =========================
 
-console.log("Database path:", "./database.sqlite");
+const voiceSessions = new Map(); // userId -> début de la période non comptabilisée
 
-const db = new sqlite3.Database(
-    "./database.sqlite"
-);
+function flushVoice(userId, now = Date.now()) {
+    const start = voiceSessions.get(userId);
+    if (!start) return;
+    economy.addVoiceTime(userId, Math.floor((now - start) / 1000));
+    voiceSessions.set(userId, now);
+}
 
-client.db = db;
-const voiceSessions = new Map();
+function flushAllVoice() {
+    const now = Date.now();
+    for (const userId of voiceSessions.keys()) flushVoice(userId, now);
+}
 
-// =========================
-// CREATE TABLE
-// =========================
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    const member = newState.member || oldState.member;
+    if (!member || member.user.bot) return;
 
-db.run(`
-CREATE TABLE IF NOT EXISTS users (
-
-    userId TEXT PRIMARY KEY,
-
-    money INTEGER DEFAULT 0,
-
-    messages INTEGER DEFAULT 0,
-
-    voiceTime INTEGER DEFAULT 0,
-
-    bank INTEGER DEFAULT 0,
-
-    xp INTEGER DEFAULT 0,
-
-    level INTEGER DEFAULT 1,
-
-    streak INTEGER DEFAULT 0,
-
-    multiplier INTEGER DEFAULT 1,
-
-    lastDaily INTEGER DEFAULT 0,
-
-    dailyStreak INTEGER DEFAULT 0,
-
-    activeQuest TEXT DEFAULT 'none',
-
-    questProgress INTEGER DEFAULT 0,
-
-    questGoal INTEGER DEFAULT 0,
-
-    questCompleted INTEGER DEFAULT 0,
-
-    lastRob INTEGER DEFAULT 0,
-
-    lastWork INTEGER DEFAULT 0,
-
-    joinedAt INTEGER DEFAULT 0
-)
-`);
-
-// =========================
-// MISE À JOUR DE LA TABLE
-// =========================
-
-db.run(
-    "ALTER TABLE users ADD COLUMN messages INTEGER DEFAULT 0",
-    err => {
-        if (err && !err.message.includes("duplicate column")) {
-            console.log(err);
-        }
+    if (!oldState.channelId && newState.channelId) {
+        voiceSessions.set(member.id, Date.now());
+    } else if (oldState.channelId && !newState.channelId) {
+        flushVoice(member.id);
+        voiceSessions.delete(member.id);
     }
-);
-
-db.run(
-    "ALTER TABLE users ADD COLUMN voiceTime INTEGER DEFAULT 0",
-    err => {
-        if (err && !err.message.includes("duplicate column")) {
-            console.log(err);
-        }
-    }
-);
-
-db.run(
-    "ALTER TABLE users ADD COLUMN bank INTEGER DEFAULT 0",
-    err => {
-        if (err && !err.message.includes("duplicate column")) {
-            console.log(err);
-        }
-    }
-);
-
-db.all("PRAGMA table_info(users)", (err, rows) => {
-    console.log(rows);
 });
 
+setInterval(flushAllVoice, 60 * 1000);
+
 // =========================
-// CREATE USER
+// GAINS VOCAUX
 // =========================
 
-function createUser(userId) {
-
-    db.run(
-        `
-        INSERT OR IGNORE INTO users (
-            userId
-        )
-        VALUES (?)
-        `,
-        [userId]
-    );
+// Seuls les membres réellement actifs gagnent de l'argent :
+// pas en AFK, pas en sourdine (casque), et au moins 2 humains dans le salon.
+function isActiveInVoice(state) {
+    if (!state.channel || !state.member || state.member.user.bot) return false;
+    if (state.channelId === state.guild.afkChannelId) return false;
+    if (state.selfDeaf || state.serverDeaf) return false;
+    const humans = state.channel.members.filter((m) => !m.user.bot && !m.voice.selfDeaf && !m.voice.serverDeaf);
+    return humans.size >= 2;
 }
 
-// =========================
-// LOAD COMMANDS
-// =========================
-
-const commandFiles =
-    fs.readdirSync("./slashCommands")
-    .filter(file =>
-        file.endsWith(".js")
-    );
-
-for (const file of commandFiles) {
-
-    const command =
-        require(`./slashCommands/${file}`);
-
-    // CHECK COMMAND
-
-    if (
-        !command.data
-        || !command.execute
-    ) {
-
-        console.log(
-            `❌ Commande invalide :
-${file}`
-        );
-
-        continue;
+setInterval(() => {
+    const rewarded = new Set();
+    for (const guild of client.guilds.cache.values()) {
+        for (const state of guild.voiceStates.cache.values()) {
+            if (rewarded.has(state.id) || !isActiveInVoice(state)) continue;
+            rewarded.add(state.id);
+            try {
+                economy.addMoney(state.id, randInt(...ECO.VOICE_GAIN));
+                economy.addXp(state.id, ECO.VOICE_XP);
+                economy.progressQuest(state.id, "vocal", ECO.VOICE_TICK / 60000);
+            } catch (err) {
+                console.error("❌ Erreur gain vocal :", err);
+            }
+        }
     }
-
-    client.commands.set(
-    command.data.name,
-    command
-);
-
-console.log("✅ Commande chargée :", command.data.name);
-}
+}, ECO.VOICE_TICK);
 
 // =========================
 // READY
 // =========================
 
-client.once(
-    Events.ClientReady,
-    () => {
-        console.log(
-            `✅ Connecté :
-${client.user.tag}`
-        );
+client.once(Events.ClientReady, () => {
+    console.log(`✅ Connecté : ${client.user.tag}`);
+
+    // Reprendre le comptage des membres déjà en vocal au démarrage
+    const now = Date.now();
+    for (const guild of client.guilds.cache.values()) {
+        for (const state of guild.voiceStates.cache.values()) {
+            if (state.channelId && state.member && !state.member.user.bot) voiceSessions.set(state.id, now);
+        }
     }
-);
+});
 
 // =========================
 // NOUVEAU MEMBRE
 // =========================
 
-client.on("guildMemberAdd", member => {
-
-    db.run(
-        `INSERT OR IGNORE INTO users (
-            userId,
-            joinedAt
-        )
-        VALUES (?, ?)`,
-        [
-             member.id,
-            Date.now()
-        ]
-    );
-
+client.on(Events.GuildMemberAdd, (member) => {
+    if (member.user.bot) return;
+    economy.ensureUser(member.id, Date.now());
 });
 
 // =========================
-// MESSAGE MONEY + XP
+// MESSAGES : ARGENT + XP
 // =========================
 
-const messageCooldown =
-    new Set();
-
-client.on(
-    "messageCreate",
-
-    async message => {
-
-        if (message.author.bot) return;
-
-        const userId =
-            message.author.id;
-
-        createUser(userId);
-
-        if (
-            messageCooldown.has(userId)
-        ) return;
-
-        messageCooldown.add(userId);
-
-        setTimeout(() => {
-
-            messageCooldown.delete(userId);
-
-        }, 30000);
-
-        db.get(
-            "SELECT * FROM users WHERE userId = ?",
-            [userId],
-
-            (err, row) => {
-
-                if (!row) return;
-
-                const gain =
-                    Math.floor(
-                        Math.random() * 50
-                    ) + 10;
-
-                let xp =
-                    row.xp + 5;
-
-                let level =
-                    row.level;
-
-                if (
-                    xp >= level * 100
-                ) {
-
-                    xp = 0;
-
-                    level++;
-
-                    try {
-
-                        message.channel.send(
-`⭐ ${message.author.username} est passé niveau ${level}`
-                        );
-
-                    } catch (err) {}
-                }
-
-                let progress =
-                    row.questProgress;
-
-                let completed =
-                    row.questCompleted;
-
-                if (
-                    row.activeQuest
-                    === "messages"
-                ) {
-
-                    progress++;
-
-                    if (
-                        progress >= row.questGoal
-                    ) {
-
-                        progress =
-                            row.questGoal;
-
-                        completed = 1;
-
-                        try {
-
-                            message.channel.send(
-`🎯 ${message.author}
-a terminé sa quête messages`
-                            );
-
-                        } catch (err) {}
-                    }
-                }
-
-                db.run(
-                    `
-                    UPDATE users
-
-                    SET money = money + ?,
-                    xp = ?,
-                    level = ?,
-                    messages = messages + 1,
-                    questProgress = ?,
-                    questCompleted = ?
-
-                    WHERE userId = ?
-                    `,
-                    [
-                        gain,
-                        xp,
-                        level,
-                        progress,
-                        completed,
-                        userId
-                    ]
-                );
-            }
-        );
-    }
-);
-
-// =========================
-// VOCAL MONEY
-// =========================
-
-setInterval(() => {
-
-    client.guilds.cache.forEach(
-        guild => {
-
-            guild.members.cache.forEach(
-                member => {
-
-                    if (
-                        member.user.bot
-                    ) return;
-
-                    if (
-                        !member.voice.channel
-                    ) return;
-
-                    createUser(
-                        member.id
-                    );
-
-                    db.get(
-                        "SELECT * FROM users WHERE userId = ?",
-                        [member.id],
-
-                        (err, row) => {
-
-                            if (!row)
-                                return;
-
-                            const gain =
-                                Math.floor(
-                                    Math.random() * 100
-                                ) + 50;
-
-                            let progress =
-                                row.questProgress;
-
-                            let completed =
-                                row.questCompleted;
-
-                            // VOCAL QUEST
-
-                            if (
-                                row.activeQuest
-                                === "vocal"
-                            ) {
-
-                                progress += 10;
-
-                                if (
-                                    progress >= row.questGoal
-                                ) {
-
-                                    progress =
-                                        row.questGoal;
-
-                                    completed = 1;
-                                }
-                            }
-
-                            db.run(
-                                `
-                                UPDATE users
-
-                                SET money = money + ?,
-                                xp = xp + 10,
-                                voiceTime = voiceTime + 600,
-                                questProgress = ?,
-                                questCompleted = ?
-
-                                WHERE userId = ?
-                                `,
-                                [
-                                    gain,
-                                    progress,
-                                    completed,
-                                    member.id
-                                ]
-                            );
-                        }
-                    );
-                }
-            );
-        }
-    );
-
-}, 600000);
-
-// =========================
-// INTERACTIONS
-// =========================
-
-client.on(
-    Events.InteractionCreate,
-
-    async interaction => {
-
-        // =====================
-        // BUTTONS
-        // =====================
-
-        if (interaction.isButton()) {
-
-            const id =
-                interaction.customId;
-
-            // =====================
-            // BLACKJACK HIT
-            // =====================
-
-            if (
-                id.startsWith("hit_")
-            ) {
-
-                const data =
-                    id.split("_");
-
-                let player =
-                    Number(data[1]);
-
-                let dealer =
-                    Number(data[2]);
-
-                const bet =
-                    Number(data[3]);
-
-                const card =
-                    Math.floor(
-                        Math.random() * 10
-                    ) + 1;
-
-                player += card;
-
-                // BUST
-
-                if (player > 21) {
-
-                    return interaction.update({
-
-                        content:
-`🃏 BLACKJACK
-
-👤 ${player}
-🤖 ${dealer}
-
-❌ BUST
-
-💸 -${bet}$`,
-
-                        components: []
-                    });
-                }
-
-                // BLACKJACK
-
-                if (player === 21) {
-
-                    db.run(
-                        `
-                        UPDATE users
-                        SET money = money + ?
-                        WHERE userId = ?
-                        `,
-                        [
-                            bet * 2,
-                            interaction.user.id
-                        ]
-                    );
-
-                    return interaction.update({
-
-                        content:
-`🃏 BLACKJACK
-
-👤 21
-🤖 ${dealer}
-
-🎉 BLACKJACK
-
-💰 +${bet * 2}$`,
-
-                        components: []
-                    });
-                }
-
-                // CONTINUE GAME
-
-                const buttons =
-                    new ActionRowBuilder()
-
-                    .addComponents(
-
-                        new ButtonBuilder()
-
-                        .setCustomId(
-                            `hit_${player}_${dealer}_${bet}`
-                        )
-
-                        .setLabel("HIT")
-
-                        .setStyle(
-                            ButtonStyle.Primary
-                        ),
-
-                        new ButtonBuilder()
-
-                        .setCustomId(
-                            `stand_${player}_${dealer}_${bet}`
-                        )
-
-                        .setLabel("STAND")
-
-                        .setStyle(
-                            ButtonStyle.Success
-                        )
-                    );
-
-                return interaction.update({
-
-                    content:
-`🃏 BLACKJACK
-
-👤 ${player}
-🤖 ${dealer}
-
-🆕 Carte :
-${card}
-
-💰 Mise :
-${bet}$`,
-
-                    components: [
-                        buttons
-                    ]
-                });
-            }
-
-            // =====================
-            // BLACKJACK STAND
-            // =====================
-
-            if (
-                id.startsWith("stand_")
-            ) {
-
-                const data =
-                    id.split("_");
-
-                const player =
-                    Number(data[1]);
-
-                let dealer =
-                    Number(data[2]);
-
-                const bet =
-                    Number(data[3]);
-
-                // DEALER PLAY
-
-                while (dealer < 17) {
-
-                    dealer +=
-                        Math.floor(
-                            Math.random() * 10
-                        ) + 1;
-                }
-
-                // WIN
-
-                if (
-                    dealer > 21
-                    || player > dealer
-                ) {
-
-                    db.run(
-                        `
-                        UPDATE users
-                        SET money = money + ?
-                        WHERE userId = ?
-                        `,
-                        [
-                            bet * 2,
-                            interaction.user.id
-                        ]
-                    );
-
-                    return interaction.update({
-
-                        content:
-`🃏 BLACKJACK
-
-👤 ${player}
-🤖 ${dealer}
-
-✅ VICTOIRE
-
-💰 +${bet * 2}$`,
-
-                        components: []
-                    });
-                }
-
-                // EQUALITY
-
-                if (
-                    player === dealer
-                ) {
-
-                    db.run(
-                        `
-                        UPDATE users
-                        SET money = money + ?
-                        WHERE userId = ?
-                        `,
-                        [
-                            bet,
-                            interaction.user.id
-                        ]
-                    );
-
-                    return interaction.update({
-
-                        content:
-`🃏 BLACKJACK
-
-👤 ${player}
-🤖 ${dealer}
-
-🤝 ÉGALITÉ
-
-💰 +${bet}$`,
-
-                        components: []
-                    });
-                }
-
-                // LOSE
-
-                return interaction.update({
-
-                    content:
-`🃏 BLACKJACK
-
-👤 ${player}
-🤖 ${dealer}
-
-❌ DÉFAITE
-
-💸 -${bet}$`,
-
-                    components: []
-                });
-            }
-        }
-
-        // =====================
-        // SLASH COMMANDS
-        // =====================
-
-        if (
-            !interaction.isChatInputCommand()
-        ) return;
-
-        const command =
-            client.commands.get(
-                interaction.commandName
-            );
-
-        if (!command) return;
-
-        try {
-
-            await command.execute(
-                interaction
-            );
-
-                } catch (error) {
-
-            console.log(error);
-
-            if (
-                interaction.replied
-                || interaction.deferred
-            ) {
-
-                await interaction.followUp({
-
-                    content:
-                        "❌ Erreur commande.",
-
-                    flags: 64
-                });
-
-            } else {
-
-                await interaction.reply({
-
-                    content:
-                        "❌ Erreur commande.",
-
-                    flags: 64
-                });
-            }
-        }
-    }
-);
-
-// =========================
-// BACKUPS SQLITE
-// =========================
-
-setInterval(() => {
+const lastMessageReward = new Map(); // userId -> timestamp
+
+client.on(Events.MessageCreate, (message) => {
+    if (message.author.bot || !message.guild) return;
+
+    const userId = message.author.id;
+    const now = Date.now();
+    if (now - (lastMessageReward.get(userId) || 0) < ECO.MESSAGE_COOLDOWN) return;
+    lastMessageReward.set(userId, now);
 
     try {
+        economy.recordMessage(userId, randInt(...ECO.MESSAGE_GAIN));
 
-        const dbPath = "/data/database.sqlite";
-        const backupDir = "/data/backups";
-
-        if (!fs.existsSync(dbPath)) {
-            console.log("⚠️ database.sqlite introuvable");
-            return;
+        const { level, leveledUp } = economy.addXp(userId, ECO.MESSAGE_XP);
+        if (leveledUp) {
+            message.channel.send(`⭐ ${message.author.username} est passé niveau ${level} !`).catch(() => {});
         }
 
-        if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir, { recursive: true });
+        if (economy.progressQuest(userId, "messages")) {
+            message.channel
+                .send(`🎯 ${message.author} a terminé sa quête messages ! Utilise \`/quests\` pour la récompense.`)
+                .catch(() => {});
         }
-
-        const date = new Date()
-            .toISOString()
-            .replace(/:/g, "-");
-
-        fs.copyFileSync(
-            dbPath,
-            `${backupDir}/${date}.sqlite`
-        );
-
-        console.log("✅ Backup sauvegardé");
-
     } catch (err) {
-
-        console.error(
-            "❌ Erreur backup :",
-            err
-        );
-
-    }
-
-}, 1800000);
-
-// =========================
-// VOICE TIME
-// =========================
-
-const voiceJoin = new Map();
-
-client.on("voiceStateUpdate", (oldState, newState) => {
-
-    const userId = newState.id;
-
-    if (!oldState.channel && newState.channel) {
-
-        voiceJoin.set(userId, Date.now());
-
-    }
-
-    if (oldState.channel && !newState.channel) {
-
-        if (!voiceJoin.has(userId)) return;
-
-        const duration = Math.floor(
-            (Date.now() - voiceJoin.get(userId)) / 1000
-        );
-
-        voiceJoin.delete(userId);
-
-        client.db.run(
-            `UPDATE users
-            SET voiceTime = voiceTime + ?
-            WHERE userId = ?`,
-            [duration, userId]
-        );
+        console.error("❌ Erreur messageCreate :", err);
     }
 });
 
-// =========================
-// SECURITY
-// =========================
-
-startAntiNuke(client);
-startBotProtection(client);
-
-// =========================
-// LOGIN
-// =========================
-
-console.log("TOKEN PRESENT =", !!process.env.TOKEN);
-console.log("TOKEN LENGTH =", process.env.TOKEN?.length);
-
-setInterval(() => {
-
-    const now = Date.now();
-
-    for (const [userId, start] of voiceSessions) {
-
-        const seconds =
-            Math.floor(
-                (now - start) / 1000
-            );
-
-        if (seconds <= 0) continue;
-
-        db.run(
-            `UPDATE users
-             SET voiceTime = voiceTime + ?
-             WHERE userId = ?`,
-            [
-                seconds,
-                userId
-            ]
-        );
-
-        voiceSessions.set(
-            userId,
-            now
-        );
-
-    }
-
-}, 60000);
-
-client.on("voiceStateUpdate", (oldState, newState) => {
-
-    const userId = newState.id;
-
-    if (newState.member.user.bot) return;
-
-    // rejoint un vocal
-    if (!oldState.channelId && newState.channelId) {
-
-        voiceSessions.set(
-            userId,
-            Date.now()
-        );
-
-    }
-
-    // quitte le vocal
-    if (oldState.channelId && !newState.channelId) {
-
-        const start =
-            voiceSessions.get(userId);
-
-        if (!start) return;
-
-        const seconds =
-            Math.floor(
-                (Date.now() - start) / 1000
-            );
-
-        db.run(
-            `UPDATE users
-             SET voiceTime = voiceTime + ?
-             WHERE userId = ?`,
-            [
-                seconds,
-                userId
-            ]
-        );
-
-        voiceSessions.delete(userId);
-
-    }
-
-});
-
-client.login(
-    process.env.TOKEN
+// Nettoyage des cooldowns de messages expirés
+setInterval(
+    () => {
+        const now = Date.now();
+        for (const [userId, time] of lastMessageReward) {
+            if (now - time > ECO.MESSAGE_COOLDOWN) lastMessageReward.delete(userId);
+        }
+    },
+    5 * 60 * 1000
 );
+
+// =========================
+// COMMANDES SLASH
+// =========================
+
+client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(`❌ Erreur /${interaction.commandName} :`, error);
+        const payload = { content: "❌ Une erreur est survenue.", flags: EPHEMERAL };
+        try {
+            if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+            else await interaction.reply(payload);
+        } catch {
+            // L'interaction a expiré : rien à faire
+        }
+    }
+});
+
+// =========================
+// SAUVEGARDES SQLITE
+// =========================
+
+setInterval(async () => {
+    try {
+        const file = await economy.backup(config.BACKUP_DIR, config.BACKUP_KEEP);
+        console.log(`✅ Backup : ${path.basename(file)}`);
+    } catch (err) {
+        console.error("❌ Erreur backup :", err);
+    }
+}, config.BACKUP_INTERVAL);
+
+// =========================
+// ERREURS & ARRÊT PROPRE
+// =========================
+
+process.on("unhandledRejection", (err) => console.error("❌ Promesse rejetée non gérée :", err));
+
+client.on(Events.Error, (err) => console.error("❌ Erreur client Discord :", err));
+
+let shuttingDown = false;
+function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`🛑 ${signal} reçu, arrêt...`);
+    try {
+        flushAllVoice();
+        economy.close();
+    } catch (err) {
+        console.error(err);
+    }
+    client.destroy().finally(() => process.exit(0));
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// =========================
+// CONNEXION
+// =========================
+
+if (!process.env.TOKEN) {
+    console.error("❌ Variable TOKEN manquante dans .env");
+    process.exit(1);
+}
+
+client.login(process.env.TOKEN).catch((err) => {
+    console.error("❌ Connexion à Discord impossible :", err.message);
+    process.exit(1);
+});

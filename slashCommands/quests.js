@@ -1,95 +1,39 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+
+const { ECONOMY } = require("../config");
+const { EPHEMERAL, money } = require("../utils/helpers");
 
 module.exports = {
-
-    data: new SlashCommandBuilder()
-
-        .setName("quests")
-
-        .setDescription(
-            "Récupérer la récompense"
-        ),
+    data: new SlashCommandBuilder().setName("quests").setDescription("Voir ta quête ou récupérer la récompense"),
 
     async execute(interaction) {
-        
-        const db =
-            interaction.client.db;
+        const economy = interaction.client.economy;
+        const userId = interaction.user.id;
 
-        db.get(
-            "SELECT * FROM users WHERE userId = ?",
-            [interaction.user.id],
-
-            (err, row) => {
-
-                if (!row) return;
-
-                // =====================
-                // NOT COMPLETED
-                // =====================
-
-                if (
-                    row.questCompleted !== 1
-                ) {
-
-                    return interaction.reply({
-
-                        content:
-`❌ Quête non terminée
-
-📈 Progression :
-${row.questProgress}/${row.questGoal}`,
-
-                        flags: 64
-                    });
-                }
-
-                // =====================
-                // REWARD
-                // =====================
-
-                const reward =
-                    10000;
-
-                db.run(
-                    `UPDATE users
-
-                    SET money = money + ?,
-                    activeQuest = 'none',
-                    questProgress = 0,
-                    questGoal = 0,
-                    questCompleted = 0
-
-                    WHERE userId = ?`,
-
-                    [
-                        reward,
-                        interaction.user.id
-                    ]
-                );
-
-                const embed =
+        if (economy.claimQuest(userId, ECONOMY.QUEST_REWARD)) {
+            return interaction.reply({
+                embeds: [
                     new EmbedBuilder()
+                        .setTitle("🎯 Quête terminée")
+                        .setColor("Green")
+                        .setDescription(
+                            `💰 Récompense : **+${money(ECONOMY.QUEST_REWARD)}**\n\nChoisis-en une autre avec \`/choosequest\`.`
+                        )
+                ]
+            });
+        }
 
-                    .setTitle(
-                        "🎯 Quête terminée"
-                    )
+        const user = economy.getUser(userId);
+        if (user.activeQuest === "none") {
+            return interaction.reply({
+                content: "❌ Aucune quête en cours. Utilise `/choosequest`.",
+                flags: EPHEMERAL
+            });
+        }
 
-                    .setColor(
-                        "Green"
-                    )
-
-                    .setDescription(
-`💰 Récompense :
-+${reward}$`
-                    );
-
-                 interaction.reply({
-                    embeds: [embed]
-                });
-            }
-        );
+        return interaction.reply({
+            content: `⏳ Quête **${user.activeQuest}** en cours\n📈 Progression : ${user.questProgress}/${user.questGoal}`,
+            flags: EPHEMERAL
+        });
     }
 };

@@ -1,56 +1,29 @@
 require("dotenv").config();
 
 const fs = require("fs");
+const path = require("path");
+const { REST, Routes } = require("discord.js");
 
-const {
-    REST,
-    Routes
-} = require("discord.js");
+const commands = fs
+    .readdirSync(path.join(__dirname, "slashCommands"))
+    .filter((file) => file.endsWith(".js"))
+    .map((file) => require(`./slashCommands/${file}`).data.toJSON());
 
-const commands = [];
+console.log("Commandes :", commands.map((c) => c.name).join(", "));
 
-const commandFiles =
-    fs.readdirSync("./slashCommands")
-    .filter(file => file.endsWith(".js"));
-
-for (const file of commandFiles) {
-
-    const command = require(`./slashCommands/${file}`);
-
-    console.log("Chargement :", command.data.name);
-
-    commands.push(command.data.toJSON());
-}
-
-console.log(commands.map(c => c.name));
-
-const rest = new REST({
-    version: "10"
-}).setToken(process.env.TOKEN);
+const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 (async () => {
-
     try {
+        // Avec GUILD_ID : déploiement instantané sur un serveur. Sinon : global.
+        const route = process.env.GUILD_ID
+            ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
+            : Routes.applicationCommands(process.env.CLIENT_ID);
 
-        console.log(
-            "⏳ Enregistrement..."
-        );
-
-        await rest.put(
-            Routes.applicationCommands(
-                process.env.CLIENT_ID
-            ),
-            {
-                body: commands
-            }
-        );
-
-        console.log(
-            "✅ Slash commands enregistrées"
-        );
-
+        await rest.put(route, { body: commands });
+        console.log(`✅ ${commands.length} slash commands enregistrées`);
     } catch (error) {
-
-        console.log(error);
+        console.error(error);
+        process.exitCode = 1;
     }
 })();

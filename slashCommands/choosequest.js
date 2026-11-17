@@ -1,108 +1,58 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+
+const { ECONOMY } = require("../config");
+const { EPHEMERAL } = require("../utils/helpers");
+
+const LABELS = {
+    messages: `Envoyer ${ECONOMY.QUEST_GOALS.messages} messages (1 compté toutes les 30 s)`,
+    vocal: `Passer ${ECONOMY.QUEST_GOALS.vocal} minutes actives en vocal`,
+    casino: `Jouer ${ECONOMY.QUEST_GOALS.casino} parties de casino (blackjack / roulette)`
+};
 
 module.exports = {
-
     data: new SlashCommandBuilder()
-
         .setName("choosequest")
-
-        .setDescription(
-            "Choisir une quête"
-        )
-
-        .addStringOption(option =>
-
+        .setDescription("Choisir une quête")
+        .addStringOption((option) =>
             option
-
-            .setName("quete")
-
-            .setDescription(
-                "Type de quête"
-            )
-
-            .setRequired(true)
-
-            .addChoices(
-
-                {
-                    name: "Messages",
-                    value: "messages"
-                },
-
-                {
-                    name: "Vocal",
-                    value: "vocal"
-                },
-
-                {
-                    name: "Casino",
-                    value: "casino"
-                }
-            )
+                .setName("quete")
+                .setDescription("Type de quête")
+                .setRequired(true)
+                .addChoices(
+                    { name: "Messages", value: "messages" },
+                    { name: "Vocal", value: "vocal" },
+                    { name: "Casino", value: "casino" }
+                )
         ),
 
     async execute(interaction) {
+        const economy = interaction.client.economy;
+        const userId = interaction.user.id;
+        const quest = interaction.options.getString("quete");
+        const user = economy.getUser(userId);
 
-        const db =
-            interaction.client.db;
+        if (user.questCompleted) {
+            return interaction.reply({
+                content: "🎯 Ta quête actuelle est terminée : récupère d'abord ta récompense avec `/quests`.",
+                flags: EPHEMERAL
+            });
+        }
 
-        const quest =
-            interaction.options.getString(
-                "quete"
-            );
+        const goal = ECONOMY.QUEST_GOALS[quest];
+        economy.startQuest(userId, quest, goal);
 
-        let goal = 0;
+        const replaced =
+            user.activeQuest !== "none" ? `\n\n⚠️ Ta quête **${user.activeQuest}** en cours a été remplacée.` : "";
 
-        if (quest === "messages")
-            goal = 30;
-
-        if (quest === "vocal")
-            goal = 30;
-
-        if (quest === "casino")
-            goal = 5;
-
-        db.run(
-            `UPDATE users
-
-            SET activeQuest = ?,
-            questProgress = 0,
-            questGoal = ?,
-            questCompleted = 0
-
-            WHERE userId = ?`,
-
-            [
-                quest,
-                goal,
-                interaction.user.id
+        return interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("🎯 Nouvelle quête")
+                    .setColor("Blue")
+                    .setDescription(
+                        `📌 ${LABELS[quest]}\n💰 Récompense : ${ECONOMY.QUEST_REWARD.toLocaleString("fr-FR")} $${replaced}`
+                    )
             ]
-        );
-
-        const embed =
-            new EmbedBuilder()
-
-            .setTitle(
-                "🎯 Nouvelle quête"
-            )
-
-            .setColor(
-                "Blue"
-            )
-
-            .setDescription(
-`📌 Quête :
-${quest}
-
-🎯 Objectif :
-${goal}`
-            );
-
-        interaction.reply({
-            embeds: [embed]
         });
     }
 };
