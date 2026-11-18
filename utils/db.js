@@ -62,6 +62,22 @@ function migrate(db) {
             amount INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (userId, item)
         );
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+        CREATE TABLE IF NOT EXISTS tax_payments (
+            userId TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            wealth INTEGER NOT NULL,
+            at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_tax_payments_user ON tax_payments(userId, at DESC);
+        CREATE TABLE IF NOT EXISTS tax_runs (
+            at INTEGER NOT NULL,
+            total INTEGER NOT NULL,
+            payers INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS member_joins (
             guildId TEXT NOT NULL,
             userId TEXT NOT NULL,
@@ -365,6 +381,65 @@ class Economy {
                 .prepare("SELECT inviterId, code, joinedAt FROM member_joins WHERE guildId = ? AND userId = ?")
                 .get(guildId, userId) || null
         );
+    }
+
+    // ---------- Réglages ----------
+
+    getSetting(key) {
+        return this.db.prepare("SELECT value FROM settings WHERE key = ?").get(key)?.value ?? null;
+    }
+
+    setSetting(key, value) {
+        this.db
+            .prepare(
+                "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+            )
+            .run(key, value);
+    }
+
+    // ---------- Impôt sur la fortune ----------
+
+    // taxOf(patrimoine) -> montant. Prélève la poche d'abord, puis la banque. L'argent est détruit.
+    collectWealthTax(taxOf, now = Date.now()) {
+        return this.db.transaction(() => {
+            const users = this.db.prepare("SELECT userId, money, bank FROM users WHERE money + bank > 0").all();
+            const takeMoney = this.db.prepare("UPDATE users SET money = money - ?, bank = bank - ? WHERE userId = ?");
+            const log = this.db.prepare("INSERT INTO tax_payments (userId, amount, wealth, at) VALUES (?, ?, ?, ?)");
+            const payers = [];
+            let total = 0;
+
+            for (const u of users) {
+                const wealth = u.money + u.bank;
+                const amount = Math.min(wealth, taxOf(wealth));
+                if (amount <= 0) continue;
+                const fromPocket = Math.min(u.money, amount);
+                takeMoney.run(fromPocket, amount - fromPocket, u.userId);
+                log.run(u.userId, amount, wealth, now);
+                payers.push({ userId: u.userId, amount, wealth });
+                total += amount;
+            }
+
+            this.db.prepare("INSERT INTO tax_runs (at, total, payers) VALUES (?, ?, ?)").run(now, total, payers.length);
+            return { total, payers };
+        })();
+    }
+
+    getTaxSummary(userId) {
+        const last = this.db
+            .prepare("SELECT amount, wealth, at FROM tax_payments WHERE userId = ? ORDER BY at DESC LIMIT 1")
+            .get(userId);
+        const { total, count } = this.db
+            .prepare("SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count FROM tax_payments WHERE userId = ?")
+            .get(userId);
+        return { last: last || null, total, count };
+    }
+
+    recentTaxRuns(limit = 5) {
+        return this.db.prepare("SELECT * FROM tax_runs ORDER BY at DESC LIMIT ?").all(limit);
+    }
+
+    totalTaxDestroyed() {
+        return this.db.prepare("SELECT COALESCE(SUM(total), 0) AS total FROM tax_runs").get().total;
     }
 
     // ---------- Sauvegardes ----------

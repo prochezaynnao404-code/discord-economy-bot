@@ -9,6 +9,7 @@ const config = require("./config");
 const { Economy } = require("./utils/db");
 const { EPHEMERAL, randInt } = require("./utils/helpers");
 const { startAntiNuke } = require("./security/antiNuke");
+const { startWealthTax } = require("./utils/tax");
 
 const ECO = config.ECONOMY;
 
@@ -72,6 +73,12 @@ console.log(`✅ ${client.commands.size} commandes chargées`);
 // =========================
 
 startAntiNuke(client, economy);
+
+// =========================
+// IMPÔT SUR LA FORTUNE (chaque dimanche à 21 h)
+// =========================
+
+startWealthTax(client, economy);
 
 // =========================
 // TEMPS VOCAL (une seule source de vérité)
