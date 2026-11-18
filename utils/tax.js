@@ -170,6 +170,7 @@ module.exports = {
     computeWealthTax,
     exemptionThreshold,
     lastDueTime,
+    zonedToUtc,
     nextDueTime,
     runWealthTax,
     startWealthTax

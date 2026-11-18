@@ -3,6 +3,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration, randInt, pick, lockUser, unlockUser } = require("../utils/helpers");
 const { applyBonus, levelBonus, formatBonus } = require("../utils/levels");
+const { BUSINESS } = require("../utils/business");
 
 const JOBS = [
     { name: "🚕 Chauffeur", word: "LIVRAISON" },
@@ -66,16 +67,24 @@ module.exports = {
 
             const { level } = economy.getUser(userId);
             let gain = randInt(...ECONOMY.WORK_GAIN);
-            if (job) gain = Math.floor(gain * 1.2);
+            if (job) gain = Math.floor(gain * (1 + BUSINESS.WORK_BONUS));
             gain = applyBonus(gain, level);
             economy.addMoney(userId, gain);
+
+            // Une part en plus (non retirée à l'employé) va au coffre de l'entreprise
+            const share = job ? Math.floor(gain * BUSINESS.WORK_SHARE) : 0;
+            if (share > 0) economy.recordEmployeeWork(userId, share);
+
             const bonuses = [
-                ...(job ? ["entreprise +20 %"] : []),
+                ...(job ? [`entreprise +${Math.round(BUSINESS.WORK_BONUS * 100)} %`] : []),
                 ...(levelBonus(level) > 0 ? [`niveau ${formatBonus(level)}`] : [])
             ];
-            return msg.reply(
-                `✅ Travail réussi\n💰 +${money(gain)}${bonuses.length ? ` (bonus ${bonuses.join(", ")})` : ""}`
-            );
+            return msg.reply({
+                content:
+                    `✅ Travail réussi\n💰 +${money(gain)}${bonuses.length ? ` (bonus ${bonuses.join(", ")})` : ""}` +
+                    (share > 0 ? `\n🏢 +${money(share)} versés à **${job.name}** pour le titre d'employé du mois` : ""),
+                allowedMentions: { parse: [] }
+            });
         } finally {
             unlockUser(userId);
         }

@@ -10,6 +10,7 @@ const { Economy } = require("./utils/db");
 const { EPHEMERAL, randInt } = require("./utils/helpers");
 const { startAntiNuke } = require("./security/antiNuke");
 const { startWealthTax } = require("./utils/tax");
+const { startEmployeeOfMonth } = require("./utils/business");
 const { applyBonus } = require("./utils/levels");
 const { announceLevelUp } = require("./utils/levelRender");
 
@@ -81,6 +82,12 @@ startAntiNuke(client, economy);
 // =========================
 
 startWealthTax(client, economy);
+
+// =========================
+// ENTREPRISES : EMPLOYÉ DU MOIS (au changement de mois)
+// =========================
+
+startEmployeeOfMonth(client, economy);
 
 // =========================
 // TEMPS VOCAL (une seule source de vérité)

@@ -88,8 +88,9 @@ test("entreprise : achat atomique, une seule par joueur, embauche unique", () =>
     assert.strictEqual(eco.createBusiness("boss", "Corp2", 1000), "exists");
     assert.strictEqual(eco.getUser("boss").money, 1000);
     const biz = eco.getBusinessByOwner("boss");
-    assert.ok(eco.hire(biz.id, "worker"));
-    assert.strictEqual(eco.hire(biz.id, "worker"), false);
+    assert.strictEqual(eco.hire(biz.id, "worker"), "ok");
+    assert.strictEqual(eco.hire(biz.id, "worker"), "taken");
+    assert.strictEqual(eco.hire(biz.id, "boss"), "taken");
     assert.strictEqual(eco.getEmployment("worker").name, "Corp");
 });
 

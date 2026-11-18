@@ -3,6 +3,7 @@ const path = require("path");
 const Database = require("better-sqlite3");
 
 const { xpForLevel, levelFromTotal } = require("./levels");
+const { UPGRADES, BOTS, businessStats, accruedPassive, monthKey } = require("./business");
 
 // Colonnes de la table users : ajoutées automatiquement si elles manquent
 const USER_COLUMNS = {
@@ -22,6 +23,34 @@ const USER_COLUMNS = {
     lastWork: "INTEGER NOT NULL DEFAULT 0",
     joinedAt: "INTEGER NOT NULL DEFAULT 0"
 };
+
+// Colonnes ajoutées aux tables existantes (entreprises v2)
+const BUSINESS_COLUMNS = {
+    marketing: "INTEGER NOT NULL DEFAULT 0",
+    bureaux: "INTEGER NOT NULL DEFAULT 0",
+    coffre: "INTEGER NOT NULL DEFAULT 0",
+    automatisation: "INTEGER NOT NULL DEFAULT 0",
+    pending: "INTEGER NOT NULL DEFAULT 0", // revenu passif accumulé (plafonné)
+    vault: "INTEGER NOT NULL DEFAULT 0", // parts reversées par les employés (non plafonné)
+    lastSettle: "INTEGER NOT NULL DEFAULT 0",
+    totalEarned: "INTEGER NOT NULL DEFAULT 0"
+};
+const EMPLOYEE_COLUMNS = {
+    contributed: "INTEGER NOT NULL DEFAULT 0",
+    works: "INTEGER NOT NULL DEFAULT 0"
+};
+
+function addColumns(db, table, columns) {
+    const existing = new Set(
+        db
+            .prepare(`PRAGMA table_info(${table})`)
+            .all()
+            .map((c) => c.name)
+    );
+    for (const [name, type] of Object.entries(columns)) {
+        if (!existing.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
+    }
+}
 
 const COOLDOWN_COLUMNS = new Set(["lastDaily", "lastRob", "lastWork"]);
 const LEADERBOARD_COLUMNS = new Set(["money", "bank", "level", "messages", "voiceTime"]);
@@ -113,9 +142,36 @@ function migrate(db) {
             draws INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (userId, game)
         );
+        CREATE TABLE IF NOT EXISTS business_bots (
+            businessId INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (businessId, type)
+        );
+        CREATE TABLE IF NOT EXISTS employee_month_stats (
+            businessId INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+            userId TEXT NOT NULL,
+            month TEXT NOT NULL,
+            works INTEGER NOT NULL DEFAULT 0,
+            contributed INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (businessId, userId, month)
+        );
+        CREATE TABLE IF NOT EXISTS employee_awards (
+            month TEXT NOT NULL,
+            businessId INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+            userId TEXT NOT NULL,
+            works INTEGER NOT NULL,
+            contributed INTEGER NOT NULL,
+            prize INTEGER NOT NULL,
+            PRIMARY KEY (month, businessId)
+        );
         CREATE INDEX IF NOT EXISTS idx_users_money ON users(money DESC);
         CREATE INDEX IF NOT EXISTS idx_users_level ON users(level DESC, xp DESC);
     `);
+    addColumns(db, "businesses", BUSINESS_COLUMNS);
+    addColumns(db, "employees", EMPLOYEE_COLUMNS);
+    // Entreprises existantes : le revenu passif démarre maintenant
+    db.prepare("UPDATE businesses SET lastSettle = ? WHERE lastSettle = 0").run(Date.now());
     migrateLevelCurve(db);
 }
 
@@ -324,14 +380,121 @@ class Economy {
         return this.db.prepare("SELECT * FROM businesses WHERE ownerId = ?").get(ownerId) || null;
     }
 
+    getBusiness(id) {
+        return this.db.prepare("SELECT * FROM businesses WHERE id = ?").get(id) || null;
+    }
+
     createBusiness(ownerId, name, price, now = Date.now()) {
         return this.db.transaction(() => {
             if (this.getBusinessByOwner(ownerId)) return "exists";
+            if (this.getEmployment(ownerId)) return "employed";
             if (!this.takeMoney(ownerId, price)) return "money";
             this.db
-                .prepare("INSERT INTO businesses (ownerId, name, createdAt) VALUES (?, ?, ?)")
-                .run(ownerId, name, now);
+                .prepare("INSERT INTO businesses (ownerId, name, createdAt, lastSettle) VALUES (?, ?, ?, ?)")
+                .run(ownerId, name, now, now);
             return "ok";
+        })();
+    }
+
+    getBusinessBots(businessId) {
+        const bots = {};
+        const rows = this.db
+            .prepare("SELECT type, amount FROM business_bots WHERE businessId = ? AND amount > 0")
+            .all(businessId);
+        for (const r of rows) bots[r.type] = r.amount;
+        return bots;
+    }
+
+    getEmployees(businessId) {
+        return this.db
+            .prepare("SELECT * FROM employees WHERE businessId = ? ORDER BY contributed DESC, hiredAt ASC")
+            .all(businessId);
+    }
+
+    // Vue complète : entreprise + robots + employés + stats + argent en attente
+    getBusinessView(businessId, now = Date.now()) {
+        const biz = this.getBusiness(businessId);
+        if (!biz) return null;
+        const bots = this.getBusinessBots(businessId);
+        const employees = this.getEmployees(businessId);
+        const stats = businessStats(biz, bots, employees.length);
+        const passive = accruedPassive(biz, stats, now);
+        return { biz, bots, employees, stats, passive, collectable: passive + biz.vault };
+    }
+
+    // Fige le revenu passif accumulé avant tout changement de taux (robots, employés, améliorations)
+    settleBusiness(businessId, now = Date.now()) {
+        const view = this.getBusinessView(businessId, now);
+        if (!view) return null;
+        this.db
+            .prepare("UPDATE businesses SET pending = ?, lastSettle = ? WHERE id = ?")
+            .run(view.passive, now, businessId);
+        return view;
+    }
+
+    collectBusiness(ownerId, now = Date.now()) {
+        return this.db.transaction(() => {
+            const biz = this.getBusinessByOwner(ownerId);
+            if (!biz) return null;
+            const view = this.settleBusiness(biz.id, now);
+            const amount = view.passive + view.biz.vault;
+            this.db
+                .prepare("UPDATE businesses SET pending = 0, vault = 0, totalEarned = totalEarned + ? WHERE id = ?")
+                .run(amount, biz.id);
+            if (amount > 0) this.addMoney(ownerId, amount);
+            return { amount, passive: view.passive, vault: view.biz.vault };
+        })();
+    }
+
+    // "ok" | "none" | "max" | "money"
+    buyUpgrade(ownerId, key, cost, now = Date.now()) {
+        if (!UPGRADES[key]) throw new Error(`Amélioration invalide : ${key}`);
+        return this.db.transaction(() => {
+            const biz = this.getBusinessByOwner(ownerId);
+            if (!biz) return "none";
+            if (biz[key] >= UPGRADES[key].max) return "max";
+            if (!this.takeMoney(ownerId, cost)) return "money";
+            this.settleBusiness(biz.id, now);
+            this.db.prepare(`UPDATE businesses SET ${key} = ${key} + 1 WHERE id = ?`).run(biz.id);
+            return "ok";
+        })();
+    }
+
+    // "ok" | "none" | "full" | "money"
+    buyBot(ownerId, type, now = Date.now()) {
+        const bot = BOTS[type];
+        if (!bot) throw new Error(`Robot invalide : ${type}`);
+        return this.db.transaction(() => {
+            const biz = this.getBusinessByOwner(ownerId);
+            if (!biz) return "none";
+            const view = this.getBusinessView(biz.id, now);
+            if (view.stats.botCount >= view.stats.maxBots) return "full";
+            if (!this.takeMoney(ownerId, bot.cost)) return "money";
+            this.settleBusiness(biz.id, now);
+            this.db
+                .prepare(
+                    `INSERT INTO business_bots (businessId, type, amount) VALUES (?, ?, 1)
+                     ON CONFLICT(businessId, type) DO UPDATE SET amount = amount + 1`
+                )
+                .run(biz.id, type);
+            return "ok";
+        })();
+    }
+
+    // Revend un robot à 50 % de son prix. Renvoie le montant remboursé (0 si impossible).
+    sellBot(ownerId, type, now = Date.now()) {
+        const bot = BOTS[type];
+        if (!bot) throw new Error(`Robot invalide : ${type}`);
+        return this.db.transaction(() => {
+            const biz = this.getBusinessByOwner(ownerId);
+            if (!biz || !this.getBusinessBots(biz.id)[type]) return 0;
+            this.settleBusiness(biz.id, now);
+            this.db
+                .prepare("UPDATE business_bots SET amount = amount - 1 WHERE businessId = ? AND type = ?")
+                .run(biz.id, type);
+            const refund = Math.floor(bot.cost / 2);
+            this.addMoney(ownerId, refund);
+            return refund;
         })();
     }
 
@@ -345,11 +508,105 @@ class Economy {
         );
     }
 
+    // "ok" | "taken" (déjà employé ou patron) | "full" (plus de place)
     hire(businessId, userId, now = Date.now()) {
-        const result = this.db
-            .prepare("INSERT OR IGNORE INTO employees (businessId, userId, hiredAt) VALUES (?, ?, ?)")
-            .run(businessId, userId, now);
-        return result.changes === 1;
+        return this.db.transaction(() => {
+            if (this.getEmployment(userId) || this.getBusinessByOwner(userId)) return "taken";
+            const view = this.getBusinessView(businessId, now);
+            if (!view) return "taken";
+            if (view.employees.length >= view.stats.maxEmployees) return "full";
+            this.settleBusiness(businessId, now);
+            this.db
+                .prepare("INSERT INTO employees (businessId, userId, hiredAt) VALUES (?, ?, ?)")
+                .run(businessId, userId, now);
+            return "ok";
+        })();
+    }
+
+    // Licenciement (businessId donné) ou démission (businessId = null)
+    removeEmployee(userId, businessId = null, now = Date.now()) {
+        return this.db.transaction(() => {
+            const job = this.getEmployment(userId);
+            if (!job || (businessId !== null && job.businessId !== businessId)) return false;
+            this.settleBusiness(job.businessId, now);
+            this.db.prepare("DELETE FROM employees WHERE userId = ?").run(userId);
+            return true;
+        })();
+    }
+
+    // Un employé a fait /work : une part (créée, pas retirée à l'employé) va au coffre de l'entreprise
+    recordEmployeeWork(userId, share, now = Date.now()) {
+        return this.db.transaction(() => {
+            const job = this.getEmployment(userId);
+            if (!job) return null;
+            this.db.prepare("UPDATE businesses SET vault = vault + ? WHERE id = ?").run(share, job.businessId);
+            this.db
+                .prepare("UPDATE employees SET contributed = contributed + ?, works = works + 1 WHERE userId = ?")
+                .run(share, userId);
+            this.db
+                .prepare(
+                    `INSERT INTO employee_month_stats (businessId, userId, month, works, contributed) VALUES (?, ?, ?, 1, ?)
+                     ON CONFLICT(businessId, userId, month) DO UPDATE SET works = works + 1,
+                     contributed = contributed + excluded.contributed`
+                )
+                .run(job.businessId, userId, monthKey(now), share);
+            return job;
+        })();
+    }
+
+    // Classement du mois (seulement les employés encore en poste)
+    monthRanking(businessId, month) {
+        return this.db
+            .prepare(
+                `SELECT s.* FROM employee_month_stats s
+                 JOIN employees e ON e.userId = s.userId AND e.businessId = s.businessId
+                 WHERE s.businessId = ? AND s.month = ? AND s.contributed > 0
+                 ORDER BY s.contributed DESC, s.works DESC`
+            )
+            .all(businessId, month);
+    }
+
+    recentAwards(businessId, limit = 5) {
+        return this.db
+            .prepare("SELECT * FROM employee_awards WHERE businessId = ? ORDER BY month DESC LIMIT ?")
+            .all(businessId, limit);
+    }
+
+    // Désigne l'employé du mois de chaque entreprise et verse sa prime (une seule fois par mois et par entreprise)
+    awardEmployeesOfMonth(month, prizeOf) {
+        return this.db.transaction(() => {
+            const winners = [];
+            const insert = this.db.prepare(
+                `INSERT OR IGNORE INTO employee_awards (month, businessId, userId, works, contributed, prize)
+                 VALUES (?, ?, ?, ?, ?, ?)`
+            );
+            for (const biz of this.db.prepare("SELECT id, name, ownerId FROM businesses").all()) {
+                const [top] = this.monthRanking(biz.id, month);
+                if (!top) continue;
+                const prize = prizeOf(top.contributed);
+                if (insert.run(month, biz.id, top.userId, top.works, top.contributed, prize).changes !== 1) continue;
+                this.addMoney(top.userId, prize);
+                winners.push({
+                    businessId: biz.id,
+                    businessName: biz.name,
+                    ownerId: biz.ownerId,
+                    userId: top.userId,
+                    works: top.works,
+                    contributed: top.contributed,
+                    prize
+                });
+            }
+            return winners;
+        })();
+    }
+
+    topBusinesses(limit = 10) {
+        return this.db
+            .prepare(
+                `SELECT b.*, (SELECT COUNT(*) FROM employees e WHERE e.businessId = b.id) AS employeeCount
+                 FROM businesses b ORDER BY totalEarned DESC LIMIT ?`
+            )
+            .all(limit);
     }
 
     // ---------- Inventaire ----------
