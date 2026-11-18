@@ -25,6 +25,7 @@ const CATEGORIES = {
     bar: "🍻 Bar",
     jeux: "🎮 Jeux",
     crime: "🦹 Crime",
+    art: "🎨 Art",
     boutique: "🛒 Boutique"
 };
 
@@ -290,6 +291,53 @@ const TITLES = [
         value: (c) => c.heistLoot
     },
 
+    // Art (dessin)
+    {
+        id: "artiste",
+        name: "Artiste en herbe",
+        rarity: "commun",
+        category: "art",
+        hint: "Enregistrer 3 œuvres dans ta galerie",
+        goal: 3,
+        value: (c) => c.works
+    },
+    {
+        id: "admire",
+        name: "Artiste admiré",
+        rarity: "rare",
+        category: "art",
+        hint: "Recevoir 10 ❤️ sur tes œuvres",
+        goal: 10,
+        value: (c) => c.likes
+    },
+    {
+        id: "maitre",
+        name: "Maître de l'art",
+        rarity: "epique",
+        category: "art",
+        hint: "Recevoir 50 ❤️ sur tes œuvres",
+        goal: 50,
+        value: (c) => c.likes
+    },
+    {
+        id: "devin",
+        name: "Devin",
+        rarity: "rare",
+        category: "art",
+        hint: "Deviner 20 mots à « Dessine et devine »",
+        goal: 20,
+        value: (c) => c.drawGuesses
+    },
+    {
+        id: "duoparfait",
+        name: "Duo parfait",
+        rarity: "epique",
+        category: "art",
+        hint: "Faire 450 points en une partie de « Dessine et devine »",
+        goal: 450,
+        value: (c) => c.drawBest
+    },
+
     // Boutique
     { id: "baron", name: "Baron", rarity: "rare", category: "boutique", price: 10 * M },
     { id: "comte", name: "Comte", rarity: "epique", category: "boutique", price: 50 * M },
@@ -322,7 +370,11 @@ function titleContext(economy, userId) {
         heists: user.heists,
         heistsWon: user.heistsWon,
         heistLoot: user.heistLoot,
-        jailCount: user.jailCount
+        jailCount: user.jailCount,
+        works: economy.getDrawings(userId).length,
+        likes: economy.likesReceived(userId),
+        drawGuesses: user.drawGuesses,
+        drawBest: user.drawBest
     };
 }
 

@@ -5,6 +5,7 @@ const Database = require("better-sqlite3");
 const { xpForLevel, levelFromTotal } = require("./levels");
 const { UPGRADES, BOTS, businessStats, accruedPassive, monthKey } = require("./business");
 const { DRINKS, IVRESSE, currentIvresse } = require("./bar");
+const { DRAWING } = require("./drawing");
 
 // Colonnes de la table users : ajoutées automatiquement si elles manquent
 const USER_COLUMNS = {
@@ -34,7 +35,11 @@ const USER_COLUMNS = {
     heistLoot: "INTEGER NOT NULL DEFAULT 0",
     jailUntil: "INTEGER NOT NULL DEFAULT 0",
     jailBail: "INTEGER NOT NULL DEFAULT 0",
-    jailCount: "INTEGER NOT NULL DEFAULT 0"
+    jailCount: "INTEGER NOT NULL DEFAULT 0",
+    drawGames: "INTEGER NOT NULL DEFAULT 0",
+    drawGuesses: "INTEGER NOT NULL DEFAULT 0",
+    drawBest: "INTEGER NOT NULL DEFAULT 0",
+    lastDrawReward: "INTEGER NOT NULL DEFAULT 0"
 };
 
 // Colonnes ajoutées aux tables existantes (entreprises v2)
@@ -65,7 +70,7 @@ function addColumns(db, table, columns) {
     }
 }
 
-const COOLDOWN_COLUMNS = new Set(["lastDaily", "lastRob", "lastWork"]);
+const COOLDOWN_COLUMNS = new Set(["lastDaily", "lastRob", "lastWork", "lastDrawReward"]);
 const LEADERBOARD_COLUMNS = new Set(["money", "bank", "level", "messages", "voiceTime"]);
 
 // Ancienne courbe (100 × niveau) : sert seulement à convertir les niveaux existants
@@ -177,6 +182,20 @@ function migrate(db) {
             contributed INTEGER NOT NULL,
             prize INTEGER NOT NULL,
             PRIMARY KEY (month, businessId)
+        );
+        CREATE TABLE IF NOT EXISTS drawings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            userId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            pixels TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_drawings_user ON drawings(userId, updatedAt DESC);
+        CREATE TABLE IF NOT EXISTS drawing_likes (
+            drawingId INTEGER NOT NULL REFERENCES drawings(id) ON DELETE CASCADE,
+            userId TEXT NOT NULL,
+            PRIMARY KEY (drawingId, userId)
         );
         CREATE TABLE IF NOT EXISTS user_titles (
             userId TEXT NOT NULL,
@@ -821,6 +840,108 @@ class Economy {
             .prepare(
                 "SELECT userId, heists, heistsWon, heistLoot, jailCount FROM users WHERE heists > 0 " +
                     "ORDER BY heistLoot DESC, heistsWon DESC LIMIT ?"
+            )
+            .all(limit);
+    }
+
+    // ---------- Dessins ----------
+
+    // Nouvelle œuvre (id null) ou mise à jour. { status: "ok" | "full" | "notfound", id }
+    saveDrawing(userId, name, pixels, id = null, now = Date.now()) {
+        return this.db.transaction(() => {
+            if (id) {
+                const r = this.db
+                    .prepare("UPDATE drawings SET name = ?, pixels = ?, updatedAt = ? WHERE id = ? AND userId = ?")
+                    .run(name, pixels, now, id, userId);
+                return r.changes ? { status: "ok", id } : { status: "notfound", id: null };
+            }
+            const { n } = this.db.prepare("SELECT COUNT(*) AS n FROM drawings WHERE userId = ?").get(userId);
+            if (n >= DRAWING.MAX_PER_USER) return { status: "full", id: null };
+            const r = this.db
+                .prepare("INSERT INTO drawings (userId, name, pixels, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)")
+                .run(userId, name, pixels, now, now);
+            return { status: "ok", id: Number(r.lastInsertRowid) };
+        })();
+    }
+
+    getDrawings(userId) {
+        return this.db
+            .prepare(
+                `SELECT d.*, (SELECT COUNT(*) FROM drawing_likes l WHERE l.drawingId = d.id) AS likes
+                 FROM drawings d WHERE d.userId = ? ORDER BY d.updatedAt DESC, d.id DESC`
+            )
+            .all(userId);
+    }
+
+    getDrawing(id) {
+        return (
+            this.db
+                .prepare(
+                    `SELECT d.*, (SELECT COUNT(*) FROM drawing_likes l WHERE l.drawingId = d.id) AS likes
+                     FROM drawings d WHERE d.id = ?`
+                )
+                .get(id) || null
+        );
+    }
+
+    deleteDrawing(userId, id) {
+        return this.db.prepare("DELETE FROM drawings WHERE id = ? AND userId = ?").run(id, userId).changes === 1;
+    }
+
+    hasLiked(drawingId, userId) {
+        return !!this.db
+            .prepare("SELECT 1 FROM drawing_likes WHERE drawingId = ? AND userId = ?")
+            .get(drawingId, userId);
+    }
+
+    // J'aime / je n'aime plus. null si l'œuvre n'existe pas ou est la sienne
+    toggleLike(drawingId, userId) {
+        return this.db.transaction(() => {
+            const d = this.getDrawing(drawingId);
+            if (!d || d.userId === userId) return null;
+            const liked = !this.hasLiked(drawingId, userId);
+            if (liked)
+                this.db.prepare("INSERT INTO drawing_likes (drawingId, userId) VALUES (?, ?)").run(drawingId, userId);
+            else this.db.prepare("DELETE FROM drawing_likes WHERE drawingId = ? AND userId = ?").run(drawingId, userId);
+            return { liked, likes: this.getDrawing(drawingId).likes };
+        })();
+    }
+
+    likesReceived(userId) {
+        return this.db
+            .prepare(
+                "SELECT COUNT(*) AS n FROM drawing_likes l JOIN drawings d ON d.id = l.drawingId WHERE d.userId = ?"
+            )
+            .get(userId).n;
+    }
+
+    topArtists(limit = 10) {
+        return this.db
+            .prepare(
+                `SELECT d.userId, COUNT(l.userId) AS likes, COUNT(DISTINCT d.id) AS works
+                 FROM drawings d LEFT JOIN drawing_likes l ON l.drawingId = d.id
+                 GROUP BY d.userId ORDER BY likes DESC, works DESC LIMIT ?`
+            )
+            .all(limit);
+    }
+
+    // Fin d'une partie de « Dessine et devine » : players [{ userId, guesses }], score de l'équipe
+    recordDrawGame(players, score) {
+        this.db.transaction(() => {
+            const update = this.db.prepare(
+                "UPDATE users SET drawGames = drawGames + 1, drawGuesses = drawGuesses + ?, drawBest = MAX(drawBest, ?) WHERE userId = ?"
+            );
+            for (const p of players) {
+                this.ensureUser(p.userId);
+                update.run(p.guesses, score, p.userId);
+            }
+        })();
+    }
+
+    topDrawScores(limit = 10) {
+        return this.db
+            .prepare(
+                "SELECT userId, drawBest, drawGames, drawGuesses FROM users WHERE drawGames > 0 ORDER BY drawBest DESC LIMIT ?"
             )
             .all(limit);
     }
