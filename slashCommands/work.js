@@ -4,6 +4,7 @@ const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration, randInt, pick, lockUser, unlockUser } = require("../utils/helpers");
 const { applyBonus, levelBonus, formatBonus } = require("../utils/levels");
 const { BUSINESS } = require("../utils/business");
+const { ivresseState } = require("../utils/bar");
 
 const JOBS = [
     { name: "🚕 Chauffeur", word: "LIVRAISON" },
@@ -65,10 +66,21 @@ module.exports = {
                 return msg.reply("❌ Mauvaise réponse, pas de salaire cette fois.");
             }
 
+            // Trop bu au bar : on peut rater son service
+            const drunk = ivresseState(economy.getIvresse(userId));
+            if (drunk.workFail > 0 && Math.random() < drunk.workFail) {
+                return msg.reply(
+                    `${drunk.emoji} Tu es **${drunk.label.toLowerCase()}** : tu t'es endormi au travail. Pas de salaire cette fois.\n` +
+                        "_Un ☕ café au `/bar` aide à dessoûler._"
+                );
+            }
+
             const { level } = economy.getUser(userId);
             let gain = randInt(...ECONOMY.WORK_GAIN);
             if (job) gain = Math.floor(gain * (1 + BUSINESS.WORK_BONUS));
             gain = applyBonus(gain, level);
+            const beforeDrink = gain;
+            gain = economy.drinkBoost(userId, "gains", gain);
             economy.addMoney(userId, gain);
 
             // Une part en plus (non retirée à l'employé) va au coffre de l'entreprise
@@ -77,7 +89,8 @@ module.exports = {
 
             const bonuses = [
                 ...(job ? [`entreprise +${Math.round(BUSINESS.WORK_BONUS * 100)} %`] : []),
-                ...(levelBonus(level) > 0 ? [`niveau ${formatBonus(level)}`] : [])
+                ...(levelBonus(level) > 0 ? [`niveau ${formatBonus(level)}`] : []),
+                ...(gain > beforeDrink ? [`bar +${money(gain - beforeDrink)}`] : [])
             ];
             return msg.reply({
                 content:

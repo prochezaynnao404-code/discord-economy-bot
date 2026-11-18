@@ -4,6 +4,7 @@ const Database = require("better-sqlite3");
 
 const { xpForLevel, levelFromTotal } = require("./levels");
 const { UPGRADES, BOTS, businessStats, accruedPassive, monthKey } = require("./business");
+const { DRINKS, IVRESSE, currentIvresse } = require("./bar");
 
 // Colonnes de la table users : ajoutées automatiquement si elles manquent
 const USER_COLUMNS = {
@@ -21,7 +22,11 @@ const USER_COLUMNS = {
     questCompleted: "INTEGER NOT NULL DEFAULT 0",
     lastRob: "INTEGER NOT NULL DEFAULT 0",
     lastWork: "INTEGER NOT NULL DEFAULT 0",
-    joinedAt: "INTEGER NOT NULL DEFAULT 0"
+    joinedAt: "INTEGER NOT NULL DEFAULT 0",
+    ivresse: "INTEGER NOT NULL DEFAULT 0",
+    ivresseAt: "INTEGER NOT NULL DEFAULT 0",
+    drinks: "INTEGER NOT NULL DEFAULT 0",
+    drinksOffered: "INTEGER NOT NULL DEFAULT 0"
 };
 
 // Colonnes ajoutées aux tables existantes (entreprises v2)
@@ -164,6 +169,14 @@ function migrate(db) {
             contributed INTEGER NOT NULL,
             prize INTEGER NOT NULL,
             PRIMARY KEY (month, businessId)
+        );
+        CREATE TABLE IF NOT EXISTS drink_effects (
+            userId TEXT NOT NULL,
+            effect TEXT NOT NULL,
+            value REAL NOT NULL,
+            expiresAt INTEGER NOT NULL,
+            drink TEXT NOT NULL,
+            PRIMARY KEY (userId, effect)
         );
         CREATE INDEX IF NOT EXISTS idx_users_money ON users(money DESC);
         CREATE INDEX IF NOT EXISTS idx_users_level ON users(level DESC, xp DESC);
@@ -606,6 +619,78 @@ class Economy {
                 `SELECT b.*, (SELECT COUNT(*) FROM employees e WHERE e.businessId = b.id) AS employeeCount
                  FROM businesses b ORDER BY totalEarned DESC LIMIT ?`
             )
+            .all(limit);
+    }
+
+    // ---------- Bar ----------
+
+    getIvresse(userId, now = Date.now()) {
+        const user = this.findUser(userId);
+        return user ? currentIvresse(user.ivresse, user.ivresseAt, now) : 0;
+    }
+
+    getDrinkEffects(userId, now = Date.now()) {
+        return this.db
+            .prepare("SELECT * FROM drink_effects WHERE userId = ? AND expiresAt > ? ORDER BY effect")
+            .all(userId, now);
+    }
+
+    // Applique les bonus de boisson actifs à un montant (type : "gains" ou "xp")
+    drinkBoost(userId, type, amount, now = Date.now()) {
+        const row = this.db
+            .prepare("SELECT value FROM drink_effects WHERE userId = ? AND effect = ? AND expiresAt > ?")
+            .get(userId, type, now);
+        return row ? Math.floor((amount * (100 + Math.round(row.value * 100))) / 100) : amount;
+    }
+
+    // buyerId paie, targetId boit (identiques si on commande pour soi)
+    // status : "ok" | "money" | "drunk"
+    buyDrink(buyerId, targetId, key, now = Date.now()) {
+        const drink = DRINKS[key];
+        if (!drink) throw new Error(`Boisson invalide : ${key}`);
+        return this.db.transaction(() => {
+            const target = this.getUser(targetId);
+            const before = currentIvresse(target.ivresse, target.ivresseAt, now);
+            if (drink.ivresse > 0 && before >= IVRESSE.MAX) return { status: "drunk", ivresse: before };
+            if (!this.takeMoney(buyerId, drink.price)) return { status: "money" };
+
+            const find = this.db.prepare(
+                "SELECT * FROM drink_effects WHERE userId = ? AND effect = ? AND expiresAt > ?"
+            );
+            const save = this.db.prepare(
+                `INSERT INTO drink_effects (userId, effect, value, expiresAt, drink) VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(userId, effect) DO UPDATE SET value = excluded.value,
+                 expiresAt = excluded.expiresAt, drink = excluded.drink`
+            );
+            const effects = [];
+            for (const [effect, value] of Object.entries(drink.effects)) {
+                const active = find.get(targetId, effect, now);
+                const expiresAt = now + drink.duration;
+                if (active && active.value > value) {
+                    // Un effet plus fort est déjà actif : on le garde
+                    effects.push({ effect, value: active.value, expiresAt: active.expiresAt, kept: active.drink });
+                    continue;
+                }
+                const finalExpiry =
+                    active && active.value === value ? Math.max(active.expiresAt, expiresAt) : expiresAt;
+                save.run(targetId, effect, value, finalExpiry, key);
+                effects.push({ effect, value, expiresAt: finalExpiry, kept: null });
+            }
+
+            const ivresse = Math.max(0, before + drink.ivresse);
+            this.db
+                .prepare("UPDATE users SET ivresse = ?, ivresseAt = ?, drinks = drinks + 1 WHERE userId = ?")
+                .run(ivresse, now, targetId);
+            if (buyerId !== targetId) {
+                this.db.prepare("UPDATE users SET drinksOffered = drinksOffered + 1 WHERE userId = ?").run(buyerId);
+            }
+            return { status: "ok", effects, ivresse, before };
+        })();
+    }
+
+    topDrinkers(limit = 10) {
+        return this.db
+            .prepare("SELECT userId, drinks, drinksOffered FROM users WHERE drinks > 0 ORDER BY drinks DESC LIMIT ?")
             .all(limit);
     }
 

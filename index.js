@@ -143,8 +143,11 @@ setInterval(() => {
             rewarded.add(state.id);
             try {
                 const { level } = economy.getUser(state.id);
-                economy.addMoney(state.id, applyBonus(randInt(...ECO.VOICE_GAIN), level));
-                const up = economy.addXp(state.id, randInt(...ECO.VOICE_XP));
+                economy.addMoney(
+                    state.id,
+                    economy.drinkBoost(state.id, "gains", applyBonus(randInt(...ECO.VOICE_GAIN), level))
+                );
+                const up = economy.addXp(state.id, economy.drinkBoost(state.id, "xp", randInt(...ECO.VOICE_XP)));
                 if (up.leveledUp) {
                     // Annonce dans le salon configuré, sinon dans le chat du salon vocal
                     announceLevelUp({
@@ -206,11 +209,14 @@ client.on(Events.MessageCreate, (message) => {
 
     try {
         const { level } = economy.getUser(userId);
-        economy.recordMessage(userId, applyBonus(randInt(...ECO.MESSAGE_GAIN), level));
+        economy.recordMessage(
+            userId,
+            economy.drinkBoost(userId, "gains", applyBonus(randInt(...ECO.MESSAGE_GAIN), level))
+        );
 
         if (now - (lastMessageXp.get(userId) || 0) >= ECO.MESSAGE_XP_COOLDOWN) {
             lastMessageXp.set(userId, now);
-            const up = economy.addXp(userId, randInt(...ECO.MESSAGE_XP));
+            const up = economy.addXp(userId, economy.drinkBoost(userId, "xp", randInt(...ECO.MESSAGE_XP)));
             if (up.leveledUp) {
                 announceLevelUp({
                     economy,
