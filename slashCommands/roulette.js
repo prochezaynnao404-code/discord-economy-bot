@@ -1,7 +1,9 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 const { ECONOMY } = require("../config");
-const { EPHEMERAL, money, randInt } = require("../utils/helpers");
+const { money, randInt } = require("../utils/helpers");
+const c = require("../utils/casino");
+const render = require("../utils/casinoRender");
 
 // Roulette européenne : 0 = vert, numéros rouges officiels
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
@@ -42,28 +44,30 @@ module.exports = {
         const userId = interaction.user.id;
         const color = interaction.options.getString("couleur");
         const bet = interaction.options.getInteger("mise");
-
-        if (!economy.takeMoney(userId, bet)) {
-            return interaction.reply({ content: "❌ Pas assez d'argent.", flags: EPHEMERAL });
-        }
+        if (!(await c.placeBet(interaction, bet))) return;
+        await interaction.deferReply();
 
         const number = randInt(0, 36);
         const result = colorOf(number);
         const won = result === color;
+        const payout = won ? bet * PAYOUT[color] : 0;
+        c.settle(economy, userId, payout);
 
-        if (won) economy.addMoney(userId, bet * PAYOUT[color]);
-        economy.progressQuest(userId, "casino");
-
-        const embed = new EmbedBuilder()
-            .setTitle("🎰 Roulette")
-            .setColor(won ? "Green" : "Red")
-            .setDescription(
-                `🎯 Résultat : ${EMOJI[result]} **${number}** (${result})\n\n` +
-                    (won
-                        ? `✅ Tu as gagné **${money(bet * PAYOUT[color] - bet)}**`
-                        : `❌ Tu as perdu **${money(bet)}**`)
-            );
-
-        return interaction.reply({ embeds: [embed] });
+        const info = `🎯 Ton pari : ${EMOJI[color]} **${color}** · 💰 Mise : **${money(bet)}**`;
+        await c.animate((p) => interaction.editReply(p), {
+            embed: new EmbedBuilder()
+                .setTitle("🎡 Roulette")
+                .setColor("DarkGreen")
+                .setDescription(`${info}\n\n🌀 Rien ne va plus…`),
+            gif: render.rouletteAnimation(number),
+            finalEmbed: new EmbedBuilder()
+                .setTitle("🎡 Roulette")
+                .setColor(won ? "Green" : "Red")
+                .setDescription(
+                    `${info}\n\nRésultat : ${EMOJI[result]} **${number}** (${result})\n\n` +
+                        (won ? `✅ Tu as gagné **${money(payout - bet)}**` : `❌ Tu as perdu **${money(bet)}**`)
+                ),
+            final: render.rouletteResult(number)
+        });
     }
 };

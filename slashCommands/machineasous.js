@@ -3,17 +3,13 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { ECONOMY } = require("../config");
 const { money } = require("../utils/helpers");
 const c = require("../utils/casino");
+const render = require("../utils/casinoRender");
 
 const JACKPOT_KEY = "casino.jackpot";
+const SYMBOLS = c.SLOT_SYMBOLS.map((s) => s.emoji);
 
 function getJackpot(economy) {
     return Number(economy.getSetting(JACKPOT_KEY) ?? c.SLOT_JACKPOT_SEED);
-}
-
-function embed({ reels, bet, jackpot, result = null, color = "Purple" }) {
-    let description = `${reels.join(" ┃ ")}\n\n💰 Mise : **${money(bet)}**\n💎 Jackpot : **${money(jackpot)}**`;
-    if (result) description += `\n\n${result}`;
-    return new EmbedBuilder().setTitle("🎰 Machine à sous").setColor(color).setDescription(description);
 }
 
 module.exports = {
@@ -34,22 +30,15 @@ module.exports = {
         const userId = interaction.user.id;
         const bet = interaction.options.getInteger("mise");
         if (!(await c.placeBet(interaction, bet))) return;
+        await interaction.deferReply();
 
         // Une partie de chaque mise alimente le jackpot
         let jackpot = getJackpot(economy) + Math.floor(bet * c.SLOT_JACKPOT_SHARE);
         economy.setSetting(JACKPOT_KEY, String(jackpot));
 
-        const final = [c.spinReel(), c.spinReel(), c.spinReel()];
-        const spinning = "🔄";
-
-        await interaction.reply({ embeds: [embed({ reels: [spinning, spinning, spinning], bet, jackpot })] });
-        for (let i = 1; i <= 3; i++) {
-            await c.sleep(700);
-            const reels = final.map((r, j) => (j < i ? r : spinning));
-            if (i < 3) await interaction.editReply({ embeds: [embed({ reels, bet, jackpot })] });
-        }
-
-        const outcome = c.slotPayout(final);
+        // Le résultat est tiré et payé tout de suite, l'animation ne fait que le montrer
+        const reels = [c.spinReel(), c.spinReel(), c.spinReel()];
+        const outcome = c.slotPayout(reels);
         let payout = Math.floor(bet * outcome.multiplier);
         if (outcome.jackpot) {
             payout = jackpot;
@@ -59,13 +48,33 @@ module.exports = {
         c.settle(economy, userId, payout);
 
         const profit = payout - bet;
+        const info = `💰 Mise : **${money(bet)}** · 💎 Jackpot : **${money(jackpot)}**`;
         const text = outcome.jackpot
-            ? `🎉🎉 **${outcome.label}** 🎉🎉\nTu remportes **${money(payout)}** !`
+            ? `🎉🎉 **JACKPOT !** Tu remportes **${money(payout)}** !`
             : payout > 0
-              ? `✅ **${outcome.label}** (x${outcome.multiplier}) → ${money(payout)} (${profit >= 0 ? "+" : ""}${money(profit)})`
+              ? `✅ **${outcome.label}** (x${String(outcome.multiplier).replace(".", ",")}) → ${money(payout)} ` +
+                `(${profit >= 0 ? "+" : "−"}${money(Math.abs(profit))})`
               : `❌ ${outcome.label} : −${money(bet)}`;
+        const banner = outcome.jackpot
+            ? { text: `JACKPOT ${money(payout)}`, color: "#f9a825", win: true }
+            : profit > 0
+              ? { text: `GAGNÉ +${money(profit)}`, color: "#2e7d32", win: true }
+              : payout > 0
+                ? { text: `REMBOURSÉ ${money(payout)}`, color: "#546e7a", win: false }
+                : { text: "PERDU", color: "#c62828", win: false };
         const color = outcome.jackpot ? "Gold" : profit > 0 ? "Green" : profit === 0 ? "Grey" : "Red";
 
-        return interaction.editReply({ embeds: [embed({ reels: final, bet, jackpot, result: text, color })] });
+        await c.animate((p) => interaction.editReply(p), {
+            embed: new EmbedBuilder()
+                .setTitle("🎰 Machine à sous")
+                .setColor("Purple")
+                .setDescription(`${info}\n\n🎲 Les rouleaux tournent…`),
+            gif: render.slotAnimation(reels, SYMBOLS),
+            finalEmbed: new EmbedBuilder()
+                .setTitle("🎰 Machine à sous")
+                .setColor(color)
+                .setDescription(`${info}\n\n${text}`),
+            final: render.slotResult(reels, banner)
+        });
     }
 };

@@ -3,23 +3,14 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { ECONOMY } = require("../config");
 const { money } = require("../utils/helpers");
 const c = require("../utils/casino");
+const render = require("../utils/casinoRender");
 
-const N = c.WHEEL_SEGMENTS.length;
-const VISIBLE = 3; // cases visibles de chaque côté du pointeur
-
-function strip(center) {
-    const cells = [];
-    for (let k = -VISIBLE; k <= VISIBLE; k++) {
-        cells.push(c.WHEEL_STYLE[c.WHEEL_SEGMENTS[(((center + k) % N) + N) % N]]);
-    }
-    const pointer = "▫️".repeat(VISIBLE) + "🔻" + "▫️".repeat(VISIBLE);
-    return `${pointer}\n${cells.join("")}`;
-}
-
-const LEGEND = Object.entries(c.WHEEL_STYLE)
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([m, e]) => `${e} x${m.replace(".", ",")}`)
-    .join("  ");
+const format = (m) => `x${String(m).replace(".", ",")}`;
+const COUNTS = c.WHEEL_SEGMENTS.reduce((acc, m) => acc.set(m, (acc.get(m) || 0) + 1), new Map());
+const LEGEND = [...COUNTS.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([m, n]) => `${format(m)} (${n} case${n > 1 ? "s" : ""})`)
+    .join(" · ");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -39,23 +30,9 @@ module.exports = {
         const userId = interaction.user.id;
         const bet = interaction.options.getInteger("mise");
         if (!(await c.placeBet(interaction, bet))) return;
+        await interaction.deferReply();
 
         const final = c.spinWheel();
-        const embed = (center, footer, color = "Blue") =>
-            new EmbedBuilder()
-                .setTitle("🎡 Roue de la fortune")
-                .setColor(color)
-                .setDescription(`💰 Mise : **${money(bet)}**\n\n${strip(center)}\n\n${footer}\n\n${LEGEND}`);
-
-        // La roue ralentit : grands sauts puis petits
-        const offsets = [30, 20, 12, 6, 3, 1];
-        await interaction.reply({ embeds: [embed(final - 40, "🌀 La roue tourne…")] });
-        for (const off of offsets) {
-            await c.sleep(650);
-            await interaction.editReply({ embeds: [embed(final - off, "🌀 La roue tourne…")] });
-        }
-        await c.sleep(800);
-
         const multiplier = c.WHEEL_SEGMENTS[final];
         const payout = Math.floor(bet * multiplier);
         c.settle(economy, userId, payout);
@@ -64,9 +41,23 @@ module.exports = {
         const result =
             multiplier === 0
                 ? `❌ **x0** : perdu −${money(bet)}`
-                : `${profit > 0 ? "✅" : profit === 0 ? "🤝" : "🟠"} **x${String(multiplier).replace(".", ",")}** → ${money(payout)} ` +
+                : `${profit > 0 ? "✅" : profit === 0 ? "🤝" : "🟠"} **${format(multiplier)}** → ${money(payout)} ` +
                   `(${profit >= 0 ? "+" : "−"}${money(Math.abs(profit))})`;
         const color = profit > 0 ? "Green" : profit === 0 ? "Grey" : "Red";
-        return interaction.editReply({ embeds: [embed(final, result, color)] });
+        const info = `💰 Mise : **${money(bet)}**`;
+
+        await c.animate((p) => interaction.editReply(p), {
+            embed: new EmbedBuilder()
+                .setTitle("🎡 Roue de la fortune")
+                .setColor("Blurple")
+                .setDescription(`${info}\n\n🌀 La roue tourne…`),
+            gif: render.wheelAnimation(c.WHEEL_SEGMENTS, final),
+            finalEmbed: new EmbedBuilder()
+                .setTitle("🎡 Roue de la fortune")
+                .setColor(color)
+                .setDescription(`${info}\n\n${result}`)
+                .setFooter({ text: LEGEND }),
+            final: render.wheelResult(c.WHEEL_SEGMENTS, final)
+        });
     }
 };

@@ -9,65 +9,83 @@ const {
 
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money } = require("../utils/helpers");
-const { createDeck, handValue, isBlackjack, formatHand } = require("../utils/cards");
+const { createDeck, handValue, isBlackjack } = require("../utils/cards");
+const c = require("../utils/casino");
+const render = require("../utils/casinoRender");
 
 const IDLE_TIMEOUT = 2 * 60 * 1000;
+const SWAP_MARGIN = 900; // temps laissé au GIF pour se charger avant d'afficher l'image fixe
 
-function buildEmbed(game, { reveal = false, result = null, color = "Blue" } = {}) {
-    const dealerShown = reveal ? game.dealer : [game.dealer[0]];
-    const dealerValue = reveal ? handValue(game.dealer) : "?";
+const labels = (game, reveal) => ({
+    dealerLabel: `Croupier : ${reveal ? handValue(game.dealer) : "?"}`,
+    playerLabel: `Toi : ${handValue(game.player)}`
+});
 
-    let description =
-        `👤 **Toi** (${handValue(game.player)})\n${formatHand(game.player)}\n\n` +
-        `🤖 **Croupier** (${dealerValue})\n${formatHand(dealerShown)}${reveal ? "" : " `??`"}\n\n` +
-        `💰 Mise : **${money(game.bet)}**`;
-    if (result) description += `\n\n${result}`;
-
-    return new EmbedBuilder().setTitle("🃏 BLACKJACK").setColor(color).setDescription(description);
+function payload(game, { image, text = null, color = "Blue", components = [] }) {
+    let description = `💰 Mise : **${money(game.bet)}**`;
+    if (text) description += `\n\n${text}`;
+    return {
+        embeds: [
+            new EmbedBuilder()
+                .setTitle("🃏 Blackjack")
+                .setColor(color)
+                .setDescription(description)
+                .setImage(`attachment://${image.name}`)
+        ],
+        files: [image.attachment],
+        attachments: [],
+        components
+    };
 }
 
-function buildButtons(game, canDouble) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("bj_hit").setLabel("Tirer").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("bj_stand").setLabel("Rester").setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId("bj_double")
-            .setLabel("Doubler")
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(!canDouble || game.player.length !== 2)
-    );
+function buttons(game, canDouble) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("bj_hit").setLabel("Tirer").setEmoji("🃏").setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId("bj_stand").setLabel("Rester").setEmoji("✋").setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId("bj_double")
+                .setLabel("Doubler")
+                .setEmoji("💰")
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(!canDouble || game.player.length !== 2)
+        )
+    ];
 }
 
-// Termine la partie, paie le joueur et renvoie l'embed final
-function settle(economy, userId, game) {
-    while (handValue(game.dealer) < 17) game.dealer.push(game.deck.pop());
-
+// Le croupier joue, le joueur est payé. Renvoie le texte et la bannière du résultat.
+function finishGame(economy, userId, game) {
     const player = handValue(game.player);
+    if (player <= 21) {
+        while (handValue(game.dealer) < 17) game.dealer.push(game.deck.pop());
+    }
     const dealer = handValue(game.dealer);
 
     let payout = 0;
-    let result;
-    let color;
-
+    let end;
     if (player > 21) {
-        result = `❌ **Tu as sauté !** −${money(game.bet)}`;
-        color = "Red";
+        end = { text: `❌ **Tu as sauté !** −${money(game.bet)}`, color: "Red", banner: ["SAUTÉ !", "#c62828"] };
     } else if (dealer > 21 || player > dealer) {
         payout = game.bet * 2;
-        result = `✅ **Victoire !** +${money(game.bet)}`;
-        color = "Green";
+        const why = dealer > 21 ? "Le croupier saute !" : "Victoire !";
+        end = {
+            text: `✅ **${why}** +${money(game.bet)}`,
+            color: "Green",
+            banner: [`GAGNÉ +${money(game.bet)}`, "#2e7d32"]
+        };
     } else if (player === dealer) {
         payout = game.bet;
-        result = "🤝 **Égalité**, mise rendue.";
-        color = "Grey";
+        end = { text: "🤝 **Égalité**, mise rendue.", color: "Grey", banner: ["ÉGALITÉ", "#546e7a"] };
     } else {
-        result = `❌ **Défaite** −${money(game.bet)}`;
-        color = "Red";
+        end = {
+            text: `❌ **Défaite** −${money(game.bet)}`,
+            color: "Red",
+            banner: [`PERDU −${money(game.bet)}`, "#c62828"]
+        };
     }
 
-    if (payout > 0) economy.addMoney(userId, payout);
-    economy.progressQuest(userId, "casino");
-    return buildEmbed(game, { reveal: true, result, color });
+    c.settle(economy, userId, payout);
+    return end;
 }
 
 module.exports = {
@@ -87,36 +105,93 @@ module.exports = {
         const economy = interaction.client.economy;
         const userId = interaction.user.id;
         const bet = interaction.options.getInteger("mise");
-
-        if (!economy.takeMoney(userId, bet)) {
-            return interaction.reply({ content: "❌ Pas assez d'argent.", flags: EPHEMERAL });
-        }
+        if (!(await c.placeBet(interaction, bet))) return;
 
         const deck = createDeck();
         const game = { deck, bet, player: [deck.pop(), deck.pop()], dealer: [deck.pop(), deck.pop()] };
+        const firstDeal = [
+            { hand: "player", index: 0 },
+            { hand: "dealer", index: 0 },
+            { hand: "player", index: 1 },
+            { hand: "dealer", index: 1 }
+        ];
 
-        // Blackjack naturel : paye 3:2
+        // ----- Blackjack naturel : paie 3 contre 2 -----
         if (isBlackjack(game.player)) {
             const dealerBj = isBlackjack(game.dealer);
             const payout = dealerBj ? bet : Math.floor(bet * 2.5);
-            economy.addMoney(userId, payout);
-            economy.progressQuest(userId, "casino");
-            const result = dealerBj
+            c.settle(economy, userId, payout);
+            const text = dealerBj
                 ? "🤝 Blackjack des deux côtés, mise rendue."
                 : `🎉 **BLACKJACK !** +${money(payout - bet)}`;
-            return interaction.reply({ embeds: [buildEmbed(game, { reveal: true, result, color: "Gold" })] });
+            const banner = dealerBj
+                ? { text: "ÉGALITÉ", color: "#546e7a" }
+                : { text: `BLACKJACK +${money(payout - bet)}`, color: "#f9a825" };
+
+            await interaction.deferReply();
+            await c.animate((p) => interaction.editReply(p), {
+                embed: new EmbedBuilder()
+                    .setTitle("🃏 Blackjack")
+                    .setColor("Blue")
+                    .setDescription(`💰 Mise : **${money(bet)}**`),
+                gif: render.dealAnimation(game, firstDeal, labels(game, true), { hideHole: false }),
+                finalEmbed: new EmbedBuilder()
+                    .setTitle("🃏 Blackjack")
+                    .setColor("Gold")
+                    .setDescription(`💰 Mise : **${money(bet)}**\n\n${text}`),
+                final: render.tableImage(game, labels(game, true), { hideHole: false, banner })
+            });
+            return;
         }
 
         const canDouble = () => economy.getUser(userId).money >= game.bet;
+        let finished = false;
+        let version = 0; // empêche de remplacer une image plus récente par une ancienne
 
+        // Après l'animation d'une carte, on affiche l'image fixe de la table
+        const swapToStill = (v) =>
+            setTimeout(() => {
+                if (v !== version || finished) return;
+                interaction
+                    .editReply(
+                        payload(game, {
+                            image: render.tableImage(game, labels(game, false), { hideHole: true }),
+                            components: buttons(game, canDouble())
+                        })
+                    )
+                    .catch(() => {});
+            }, deal.duration + SWAP_MARGIN);
+
+        // ----- Distribution animée -----
+        let deal = render.dealAnimation(game, firstDeal, labels(game, false), { hideHole: true });
         const response = await interaction.reply({
-            embeds: [buildEmbed(game)],
-            components: [buildButtons(game, canDouble())],
+            ...payload(game, { image: deal, components: buttons(game, canDouble()) }),
             withResponse: true
         });
         const message = response.resource.message;
+        swapToStill(version);
 
-        let finished = false;
+        // Fin de partie : le croupier révèle sa carte et tire, avec animation
+        const showEnd = async (edit, { playerDrew }) => {
+            const end = finishGame(economy, userId, game);
+            version++;
+            const order = [
+                ...(playerDrew ? [{ hand: "player", index: game.player.length - 1 }] : []),
+                ...game.dealer.slice(2).map((_, k) => ({ hand: "dealer", index: k + 2 }))
+            ];
+            const final = render.tableImage(game, labels(game, true), {
+                hideHole: false,
+                banner: { text: end.banner[0], color: end.banner[1] }
+            });
+            if (order.length === 0) {
+                return edit(payload(game, { image: final, text: end.text, color: end.color }));
+            }
+            const gif = render.dealAnimation(game, order, labels(game, true), { hideHole: false });
+            await edit(payload(game, { image: gif, text: "🃏 Le croupier révèle sa carte…" }));
+            await c.sleep(gif.duration + SWAP_MARGIN);
+            await interaction.editReply(payload(game, { image: final, text: end.text, color: end.color }));
+        };
+
         const collector = message.createMessageComponentCollector({
             componentType: ComponentType.Button,
             idle: IDLE_TIMEOUT
@@ -129,15 +204,18 @@ module.exports = {
                 }
                 if (finished) return button.deferUpdate();
 
+                let playerDrew = false;
                 if (button.customId === "bj_double") {
                     if (game.player.length !== 2 || !economy.takeMoney(userId, game.bet)) {
                         return button.reply({ content: "❌ Pas assez d'argent pour doubler.", flags: EPHEMERAL });
                     }
                     game.bet *= 2;
                     game.player.push(game.deck.pop());
+                    playerDrew = true;
                     finished = true;
                 } else if (button.customId === "bj_hit") {
                     game.player.push(game.deck.pop());
+                    playerDrew = true;
                     if (handValue(game.player) >= 21) finished = true;
                 } else {
                     finished = true;
@@ -145,9 +223,19 @@ module.exports = {
 
                 if (finished) {
                     collector.stop("done");
-                    return button.update({ embeds: [settle(economy, userId, game)], components: [] });
+                    return showEnd((p) => button.update(p), { playerDrew });
                 }
-                return button.update({ embeds: [buildEmbed(game)], components: [buildButtons(game, canDouble())] });
+
+                // Carte tirée : petite animation puis image fixe
+                version++;
+                deal = render.dealAnimation(
+                    game,
+                    [{ hand: "player", index: game.player.length - 1 }],
+                    labels(game, false),
+                    { hideHole: true }
+                );
+                await button.update(payload(game, { image: deal, components: buttons(game, canDouble()) }));
+                swapToStill(version);
             } catch (err) {
                 console.error("❌ Erreur blackjack :", err);
             }
@@ -157,8 +245,7 @@ module.exports = {
         collector.on("end", (_, reason) => {
             if (reason === "done" || finished) return;
             finished = true;
-            const embed = settle(economy, userId, game);
-            interaction.editReply({ embeds: [embed], components: [] }).catch(() => {});
+            showEnd((p) => interaction.editReply(p), { playerDrew: false }).catch(() => {});
         });
     }
 };

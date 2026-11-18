@@ -3,10 +3,13 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money } = require("../utils/helpers");
 const c = require("../utils/casino");
+const { crashImage } = require("../utils/casinoRender");
 
 const TICK = 1000;
 
 function render({ bet, multiplier, auto, state, crash = null, payout = 0 }) {
+    // Temps écoulé correspondant au multiplicateur affiché (pour dessiner la courbe)
+    const elapsed = c.crashTimeFor(Math.max(1, multiplier));
     const gain = Math.floor(bet * multiplier);
     const embed = new EmbedBuilder().setTitle("🚀 Crash");
     let description = `📈 **x${multiplier.toFixed(2)}**\n💰 Mise : **${money(bet)}**`;
@@ -37,7 +40,16 @@ function render({ bet, multiplier, auto, state, crash = null, payout = 0 }) {
                   )
               ]
             : [];
-    return { embeds: [embed], components };
+
+    // Image de la courbe et de la fusée, redessinée à chaque mise à jour
+    const image = crashImage({
+        multiplier,
+        elapsed,
+        state,
+        cashout: state === "cashed" ? `Encaissé · la fusée a crashé à x${crash.toFixed(2)}` : null
+    });
+    embed.setImage(`attachment://${image.name}`);
+    return { embeds: [embed], files: [image.attachment], attachments: [], components };
 }
 
 module.exports = {

@@ -25,6 +25,25 @@ function settle(economy, userId, payout) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Affiche l'animation (GIF), attend qu'elle soit jouée puis la remplace par l'image du résultat.
+// edit = fonction qui modifie le message (ex : interaction.editReply)
+async function animate(edit, { embed, gif, finalEmbed, final, components = [] }) {
+    await edit({
+        embeds: [embed.setImage(`attachment://${gif.name}`)],
+        files: [gif.attachment],
+        attachments: [],
+        components: []
+    });
+    // Petite marge : le GIF met un instant à se charger chez le joueur
+    await module.exports.sleep(gif.duration + 900);
+    await edit({
+        embeds: [finalEmbed.setImage(`attachment://${final.name}`)],
+        files: [final.attachment],
+        attachments: [],
+        components
+    });
+}
+
 function weightedPick(items, weightOf = (i) => i.weight, random = Math.random) {
     const total = items.reduce((s, i) => s + weightOf(i), 0);
     let roll = random() * total;
@@ -187,6 +206,7 @@ module.exports = {
     placeBet,
     settle,
     sleep,
+    animate,
     weightedPick,
     SLOT_SYMBOLS,
     SLOT_TRIPLES,

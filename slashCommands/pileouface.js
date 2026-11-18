@@ -3,6 +3,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money } = require("../utils/helpers");
 const c = require("../utils/casino");
+const render = require("../utils/casinoRender");
 const { setupMatch, unlockPlayers } = require("../utils/games/session");
 
 const FACES = { pile: "🪙 Pile", face: "👑 Face" };
@@ -65,19 +66,7 @@ module.exports = {
                 (match.vsBot ? "" : ` · ${rival.mention} : **${FACES[choice === "pile" ? "face" : "pile"]}**`) +
                 `\n💰 Mise : **${money(bet)}**${match.vsBot ? "" : ` chacun (pot ${money(bet * 2)})`}`;
 
-            const message = await match.respond({
-                content: "",
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("🪙 Pile ou face")
-                        .setColor("Blue")
-                        .setDescription(`${intro}\n\n🌀 La pièce tourne…`)
-                ],
-                components: []
-            });
-            await c.sleep(1500);
-
-            // ----- Résultat -----
+            // ----- Résultat (tiré et payé avant l'animation) -----
             const result = c.flipCoin();
             const winner = sides[result];
             let outcome;
@@ -92,13 +81,34 @@ module.exports = {
             }
 
             const won = match.vsBot ? winner?.id === me.id : true;
+
+            // ----- Animation : la pièce est lancée, puis l'image du résultat -----
+            const gif = render.coinAnimation(result);
+            const message = await match.respond({
+                content: "",
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🪙 Pile ou face")
+                        .setColor("Blue")
+                        .setDescription(`${intro}\n\n🌀 La pièce tourne…`)
+                        .setImage(`attachment://${gif.name}`)
+                ],
+                files: [gif.attachment],
+                components: []
+            });
+            await c.sleep(gif.duration + 900);
+
+            const final = render.coinResult(result);
             await message.edit({
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("🪙 Pile ou face")
                         .setColor(won ? "Green" : "Red")
                         .setDescription(`${intro}\n\nRésultat : **${FACES[result]}**\n\n${outcome}`)
-                ]
+                        .setImage(`attachment://${final.name}`)
+                ],
+                files: [final.attachment],
+                attachments: []
             });
         } finally {
             unlockPlayers(ids);
