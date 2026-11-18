@@ -6,6 +6,7 @@ const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 
 const { xpForLevel, levelColor } = require("../utils/levels");
+const { monthKey } = require("../utils/business");
 
 GlobalFonts.registerFromPath(path.join(__dirname, "../assets/fonts/Poppins-Bold.ttf"), "Poppins");
 
@@ -20,6 +21,37 @@ function getIcons() {
         ).then((images) => Object.fromEntries(ICON_NAMES.map((name, i) => [`${name}Icon`, images[i]])));
     }
     return iconsPromise;
+}
+
+// Coupe le texte avec « … » s'il dépasse la largeur disponible
+function fitText(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    let cut = text;
+    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > maxWidth) cut = cut.slice(0, -1);
+    return `${cut.trimEnd()}…`;
+}
+
+const fmt = (n) => `${n.toLocaleString("fr-FR")} $`;
+
+function businessInfo(economy, userId) {
+    const owned = economy.getBusinessByOwner(userId);
+    if (owned) {
+        const { stats, employees } = economy.getBusinessView(owned.id);
+        return {
+            owner: true,
+            name: owned.name,
+            detail: `Patron · ${fmt(stats.hourly)}/h · ${employees.length} employé(s) · ${stats.botCount} robot(s)`
+        };
+    }
+    const job = economy.getEmployment(userId);
+    if (!job) return null;
+    const month = monthKey();
+    const rank = economy.monthRanking(job.businessId, month).findIndex((r) => r.userId === userId);
+    const awards = economy.recentAwards(job.businessId, 100).filter((a) => a.userId === userId).length;
+    const parts = [`Employé · ${fmt(job.contributed)} rapportés`];
+    if (rank >= 0) parts.push(rank === 0 ? "1er du mois" : `${rank + 1}e du mois`);
+    if (awards) parts.push(`${awards}x employé du mois`);
+    return { owner: false, name: job.name, detail: parts.join(" · ") };
 }
 
 module.exports = {
@@ -293,6 +325,26 @@ module.exports = {
         ctx.fillStyle = "white";
         ctx.font = "bold 24px Poppins";
         ctx.fillText(member?.joinedAt ? member.joinedAt.toLocaleDateString("fr-FR") : "—", 760, 434);
+
+        // Entreprise (patron ou employé)
+
+        const business = businessInfo(economy, user.id);
+
+        ctx.drawImage(bankIcon, 560, 480, 30, 30);
+
+        ctx.fillStyle = "#aab4c3";
+        ctx.font = "22px Poppins";
+        ctx.fillText("Entreprise", 605, 504);
+
+        ctx.fillStyle = business ? "white" : "#6b7585";
+        ctx.font = "bold 24px Poppins";
+        ctx.fillText(fitText(ctx, business ? business.name : "Aucune", 270), 760, 504);
+
+        if (business) {
+            ctx.fillStyle = business.owner ? accent : "#aab4c3";
+            ctx.font = "18px Poppins";
+            ctx.fillText(fitText(ctx, business.detail, 430), 605, 538);
+        }
 
         // ==========================
         // ENVOI
