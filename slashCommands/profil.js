@@ -5,6 +5,8 @@ const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 
+const { xpForLevel, levelColor } = require("../utils/levels");
+
 GlobalFonts.registerFromPath(path.join(__dirname, "../assets/fonts/Poppins-Bold.ttf"), "Poppins");
 
 // Icônes chargées une seule fois puis gardées en mémoire
@@ -73,15 +75,7 @@ module.exports = {
         // COULEUR DU NIVEAU
         // ==========================
 
-        let accent = "#43b581";
-
-        if (data.level >= 10) accent = "#3498db";
-
-        if (data.level >= 25) accent = "#9b59b6";
-
-        if (data.level >= 50) accent = "#f39c12";
-
-        if (data.level >= 75) accent = "#e74c3c";
+        const accent = levelColor(data.level);
 
         ctx.fillStyle = accent;
 
@@ -157,7 +151,7 @@ module.exports = {
         // BARRE XP
         // ==========================
 
-        const maxXP = data.level * 100;
+        const maxXP = xpForLevel(data.level);
 
         const percent = Math.min(data.xp / maxXP, 1);
 

@@ -43,9 +43,9 @@ test("deposit / withdraw", () => {
 
 test("addXp garde le surplus et peut monter plusieurs niveaux", () => {
     const eco = fresh();
-    const r = eco.addXp("a", 350); // niveau 1 -> 100, niveau 2 -> 200, reste 50
-    assert.deepStrictEqual(r, { level: 3, leveledUp: true });
-    assert.strictEqual(eco.getUser("a").xp, 50);
+    const r = eco.addXp("a", 400); // niveau 1 -> 155, niveau 2 -> 220, reste 25
+    assert.deepStrictEqual(r, { level: 3, xp: 25, previous: 1, leveledUp: true });
+    assert.strictEqual(eco.getUser("a").xp, 25);
 });
 
 test("tryCooldown bloque puis libère", () => {

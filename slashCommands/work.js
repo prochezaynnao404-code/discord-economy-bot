@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration, randInt, pick, lockUser, unlockUser } = require("../utils/helpers");
+const { applyBonus, levelBonus, formatBonus } = require("../utils/levels");
 
 const JOBS = [
     { name: "🚕 Chauffeur", word: "LIVRAISON" },
@@ -63,10 +64,18 @@ module.exports = {
                 return msg.reply("❌ Mauvaise réponse, pas de salaire cette fois.");
             }
 
+            const { level } = economy.getUser(userId);
             let gain = randInt(...ECONOMY.WORK_GAIN);
             if (job) gain = Math.floor(gain * 1.2);
+            gain = applyBonus(gain, level);
             economy.addMoney(userId, gain);
-            return msg.reply(`✅ Travail réussi\n💰 +${money(gain)}${job ? " (bonus entreprise +20 %)" : ""}`);
+            const bonuses = [
+                ...(job ? ["entreprise +20 %"] : []),
+                ...(levelBonus(level) > 0 ? [`niveau ${formatBonus(level)}`] : [])
+            ];
+            return msg.reply(
+                `✅ Travail réussi\n💰 +${money(gain)}${bonuses.length ? ` (bonus ${bonuses.join(", ")})` : ""}`
+            );
         } finally {
             unlockUser(userId);
         }

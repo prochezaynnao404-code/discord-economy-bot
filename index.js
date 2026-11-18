@@ -10,6 +10,8 @@ const { Economy } = require("./utils/db");
 const { EPHEMERAL, randInt } = require("./utils/helpers");
 const { startAntiNuke } = require("./security/antiNuke");
 const { startWealthTax } = require("./utils/tax");
+const { applyBonus } = require("./utils/levels");
+const { announceLevelUp } = require("./utils/levelRender");
 
 const ECO = config.ECONOMY;
 
@@ -133,8 +135,20 @@ setInterval(() => {
             if (rewarded.has(state.id) || !isActiveInVoice(state)) continue;
             rewarded.add(state.id);
             try {
-                economy.addMoney(state.id, randInt(...ECO.VOICE_GAIN));
-                economy.addXp(state.id, ECO.VOICE_XP);
+                const { level } = economy.getUser(state.id);
+                economy.addMoney(state.id, applyBonus(randInt(...ECO.VOICE_GAIN), level));
+                const up = economy.addXp(state.id, randInt(...ECO.VOICE_XP));
+                if (up.leveledUp) {
+                    // Annonce dans le salon configuré, sinon dans le chat du salon vocal
+                    announceLevelUp({
+                        economy,
+                        guild,
+                        user: state.member.user,
+                        level: up.level,
+                        previous: up.previous,
+                        fallback: state.channel
+                    }).catch((err) => console.error("❌ Annonce de niveau :", err.message));
+                }
                 economy.progressQuest(state.id, "vocal", ECO.VOICE_TICK / 60000);
             } catch (err) {
                 console.error("❌ Erreur gain vocal :", err);
@@ -172,7 +186,8 @@ client.on(Events.GuildMemberAdd, (member) => {
 // MESSAGES : ARGENT + XP
 // =========================
 
-const lastMessageReward = new Map(); // userId -> timestamp
+const lastMessageReward = new Map(); // userId -> timestamp (argent)
+const lastMessageXp = new Map(); // userId -> timestamp (XP, cooldown plus long contre le spam)
 
 client.on(Events.MessageCreate, (message) => {
     if (message.author.bot || !message.guild) return;
@@ -183,11 +198,22 @@ client.on(Events.MessageCreate, (message) => {
     lastMessageReward.set(userId, now);
 
     try {
-        economy.recordMessage(userId, randInt(...ECO.MESSAGE_GAIN));
+        const { level } = economy.getUser(userId);
+        economy.recordMessage(userId, applyBonus(randInt(...ECO.MESSAGE_GAIN), level));
 
-        const { level, leveledUp } = economy.addXp(userId, ECO.MESSAGE_XP);
-        if (leveledUp) {
-            message.channel.send(`⭐ ${message.author.username} est passé niveau ${level} !`).catch(() => {});
+        if (now - (lastMessageXp.get(userId) || 0) >= ECO.MESSAGE_XP_COOLDOWN) {
+            lastMessageXp.set(userId, now);
+            const up = economy.addXp(userId, randInt(...ECO.MESSAGE_XP));
+            if (up.leveledUp) {
+                announceLevelUp({
+                    economy,
+                    guild: message.guild,
+                    user: message.author,
+                    level: up.level,
+                    previous: up.previous,
+                    fallback: message.channel
+                }).catch((err) => console.error("❌ Annonce de niveau :", err.message));
+            }
         }
 
         if (economy.progressQuest(userId, "messages")) {
@@ -206,6 +232,9 @@ setInterval(
         const now = Date.now();
         for (const [userId, time] of lastMessageReward) {
             if (now - time > ECO.MESSAGE_COOLDOWN) lastMessageReward.delete(userId);
+        }
+        for (const [userId, time] of lastMessageXp) {
+            if (now - time > ECO.MESSAGE_XP_COOLDOWN) lastMessageXp.delete(userId);
         }
     },
     5 * 60 * 1000

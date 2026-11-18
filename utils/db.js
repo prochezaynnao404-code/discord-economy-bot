@@ -2,6 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const Database = require("better-sqlite3");
 
+const { xpForLevel, levelFromTotal } = require("./levels");
+
 // Colonnes de la table users : ajoutées automatiquement si elles manquent
 const USER_COLUMNS = {
     money: "INTEGER NOT NULL DEFAULT 0",
@@ -24,8 +26,25 @@ const USER_COLUMNS = {
 const COOLDOWN_COLUMNS = new Set(["lastDaily", "lastRob", "lastWork"]);
 const LEADERBOARD_COLUMNS = new Set(["money", "bank", "level", "messages", "voiceTime"]);
 
-function xpForLevel(level) {
-    return level * 100;
+// Ancienne courbe (100 × niveau) : sert seulement à convertir les niveaux existants
+function oldTotalXp(level, xp) {
+    return (100 * (level - 1) * level) / 2 + xp;
+}
+
+// Passage à la courbe progressive : l'XP totale de chacun est conservée
+function migrateLevelCurve(db) {
+    const done = db.prepare("SELECT value FROM settings WHERE key = 'levels.curve'").get();
+    if (done?.value === "2") return;
+    db.transaction(() => {
+        const update = db.prepare("UPDATE users SET level = ?, xp = ? WHERE userId = ?");
+        for (const u of db.prepare("SELECT userId, level, xp FROM users WHERE level > 1 OR xp > 0").all()) {
+            const { level, xp } = levelFromTotal(oldTotalXp(u.level, u.xp));
+            update.run(level, xp, u.userId);
+        }
+        db.prepare(
+            "INSERT INTO settings (key, value) VALUES ('levels.curve', '2') ON CONFLICT(key) DO UPDATE SET value = '2'"
+        ).run();
+    })();
 }
 
 function migrate(db) {
@@ -97,6 +116,7 @@ function migrate(db) {
         CREATE INDEX IF NOT EXISTS idx_users_money ON users(money DESC);
         CREATE INDEX IF NOT EXISTS idx_users_level ON users(level DESC, xp DESC);
     `);
+    migrateLevelCurve(db);
 }
 
 class Economy {
@@ -190,7 +210,7 @@ class Economy {
                 level++;
             }
             this.db.prepare("UPDATE users SET xp = ?, level = ? WHERE userId = ?").run(xp, level, userId);
-            return { level, leveledUp: level > user.level };
+            return { level, xp, previous: user.level, leveledUp: level > user.level };
         })();
     }
 
@@ -210,7 +230,7 @@ class Economy {
 
     // ---------- Daily ----------
 
-    claimDaily(userId, { reward, streakMax, cooldown }, now = Date.now()) {
+    claimDaily(userId, { reward, streakMax, cooldown, multiplier = 1 }, now = Date.now()) {
         return this.db.transaction(() => {
             const user = this.getUser(userId);
             if (user.lastDaily && now - user.lastDaily < cooldown) {
@@ -219,7 +239,7 @@ class Economy {
             // Série perdue si plus de 48 h depuis le dernier daily
             const kept = user.lastDaily && now - user.lastDaily < cooldown * 2;
             let streak = (kept ? user.dailyStreak : 0) + 1;
-            let gain = reward;
+            let gain = Math.floor(reward * multiplier);
             const bonus = streak >= streakMax;
             if (bonus) gain *= 2;
             this.db

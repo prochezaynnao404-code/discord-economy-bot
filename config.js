@@ -23,11 +23,17 @@ module.exports = {
     ECONOMY: {
         MESSAGE_COOLDOWN: 30 * 1000,
         MESSAGE_GAIN: [10, 60],
-        MESSAGE_XP: 5,
+        MESSAGE_XP: [15, 25],
+        MESSAGE_XP_COOLDOWN: 60 * 1000,
 
         VOICE_TICK: 10 * 60 * 1000,
         VOICE_GAIN: [50, 150],
-        VOICE_XP: 10,
+        VOICE_XP: [60, 100], // par tranche de 10 minutes actives
+
+        LEVELS: {
+            BONUS_PER_LEVEL: 0.01, // +1 % de gains par niveau
+            BONUS_MAX: 0.5 // plafond : +50 %
+        },
 
         DAILY_REWARD: 5000,
         DAILY_STREAK_MAX: 10,
