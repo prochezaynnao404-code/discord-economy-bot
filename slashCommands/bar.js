@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require("discord.js");
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const { EPHEMERAL, money } = require("../utils/helpers");
 const { DRINKS, EFFECT_LABELS, IVRESSE, ivresseState, soberAt, percent } = require("../utils/bar");

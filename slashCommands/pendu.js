@@ -1,11 +1,11 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     StringSelectMenuBuilder
 } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const { askText, busyWith, lockPlayers, unlockPlayers } = require("../utils/games/session");
 const { HangmanGame, MAX_ERRORS } = require("../utils/games/hangman");

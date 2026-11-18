@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 module.exports = {
     data: new SlashCommandBuilder().setName("inventory").setDescription("Voir ton inventaire"),

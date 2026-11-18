@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration } = require("../utils/helpers");

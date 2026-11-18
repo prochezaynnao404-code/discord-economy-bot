@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 const { Chess } = require("chess.js");
 
 const { setupMatch, askText, runTurnGame, commonButtons, recordResult, resultText } = require("../utils/games/session");

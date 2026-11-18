@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { AuditLogEvent, AttachmentBuilder, EmbedBuilder } = require("discord.js");
+const { AuditLogEvent, AttachmentBuilder } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const config = require("../config");
 

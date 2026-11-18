@@ -1,6 +1,5 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -8,6 +7,7 @@ const {
     StringSelectMenuBuilder,
     UserSelectMenuBuilder
 } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const { EPHEMERAL, money } = require("../utils/helpers");
 const {

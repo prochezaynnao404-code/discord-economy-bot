@@ -1,10 +1,12 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration, randInt, pick, lockUser, unlockUser } = require("../utils/helpers");
 const { applyBonus, levelBonus, formatBonus } = require("../utils/levels");
 const { BUSINESS } = require("../utils/business");
 const { ivresseState } = require("../utils/bar");
+const { syncTitles, newTitlesText } = require("../utils/titles");
 
 const JOBS = [
     { name: "🚕 Chauffeur", word: "LIVRAISON" },
@@ -92,10 +94,14 @@ module.exports = {
                 ...(levelBonus(level) > 0 ? [`niveau ${formatBonus(level)}`] : []),
                 ...(gain > beforeDrink ? [`bar +${money(gain - beforeDrink)}`] : [])
             ];
+            const newTitles = syncTitles(economy, userId);
             return msg.reply({
                 content:
                     `✅ Travail réussi\n💰 +${money(gain)}${bonuses.length ? ` (bonus ${bonuses.join(", ")})` : ""}` +
-                    (share > 0 ? `\n🏢 +${money(share)} versés à **${job.name}** pour le titre d'employé du mois` : ""),
+                    (share > 0
+                        ? `\n🏢 +${money(share)} versés à **${job.name}** pour le titre d'employé du mois`
+                        : "") +
+                    (newTitles.length ? `\n${newTitlesText(newTitles)}` : ""),
                 allowedMentions: { parse: [] }
             });
         } finally {

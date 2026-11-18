@@ -1,11 +1,5 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ComponentType
-} = require("discord.js");
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { EmbedBuilder } = require("../utils/theme");
 
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration, randInt, pick, shuffle, lockUser, unlockUser } = require("../utils/helpers");

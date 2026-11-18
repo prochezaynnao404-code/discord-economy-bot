@@ -1,37 +1,22 @@
-const fs = require("fs");
-const path = require("path");
-
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 
-const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
-
+const { ECONOMY } = require("../config");
 const { xpForLevel, levelColor } = require("../utils/levels");
 const { monthKey } = require("../utils/business");
+const { ivresseState } = require("../utils/bar");
+const { renderProfile } = require("../utils/profileRender");
+const { RARITIES, syncTitles, equippedTitle, newTitlesText } = require("../utils/titles");
 
-GlobalFonts.registerFromPath(path.join(__dirname, "../assets/fonts/Poppins-Bold.ttf"), "Poppins");
+const fmt = (n) => `${Number(n).toLocaleString("fr-FR").replace(/\s/g, " ")} $`;
 
-// Icônes chargées une seule fois puis gardées en mémoire
-const ICON_NAMES = ["money", "bank", "message", "mic", "trophy", "calendar"];
-let iconsPromise = null;
-
-function getIcons() {
-    if (!iconsPromise) {
-        iconsPromise = Promise.all(
-            ICON_NAMES.map((name) => loadImage(fs.readFileSync(path.join(__dirname, `../assets/icons/${name}.png`))))
-        ).then((images) => Object.fromEntries(ICON_NAMES.map((name, i) => [`${name}Icon`, images[i]])));
-    }
-    return iconsPromise;
-}
-
-// Coupe le texte avec « … » s'il dépasse la largeur disponible
-function fitText(ctx, text, maxWidth) {
-    if (ctx.measureText(text).width <= maxWidth) return text;
-    let cut = text;
-    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > maxWidth) cut = cut.slice(0, -1);
-    return `${cut.trimEnd()}…`;
-}
-
-const fmt = (n) => `${n.toLocaleString("fr-FR")} $`;
+const BADGE_COLORS = {
+    gold: "#f7c948",
+    amber: "#d9a441",
+    purple: "#a77bf3",
+    blue: "#5b8def",
+    green: "#43c59e",
+    red: "#f2545b"
+};
 
 function businessInfo(economy, userId) {
     const owned = economy.getBusinessByOwner(userId);
@@ -40,27 +25,46 @@ function businessInfo(economy, userId) {
         return {
             owner: true,
             name: owned.name,
-            detail: `Patron · ${fmt(stats.hourly)}/h · ${employees.length} employé(s) · ${stats.botCount} robot(s)`
+            detail: `${fmt(stats.hourly)}/h  ·  ${employees.length} employé(s)  ·  ${stats.botCount} robot(s)`
         };
     }
     const job = economy.getEmployment(userId);
     if (!job) return null;
-    const month = monthKey();
-    const rank = economy.monthRanking(job.businessId, month).findIndex((r) => r.userId === userId);
-    const awards = economy.recentAwards(job.businessId, 100).filter((a) => a.userId === userId).length;
-    const parts = [`Employé · ${fmt(job.contributed)} rapportés`];
+    const rank = economy.monthRanking(job.businessId, monthKey()).findIndex((r) => r.userId === userId);
+    const parts = [`${fmt(job.contributed)} rapportés`];
     if (rank >= 0) parts.push(rank === 0 ? "1er du mois" : `${rank + 1}e du mois`);
-    if (awards) parts.push(`${awards}x employé du mois`);
-    return { owner: false, name: job.name, detail: parts.join(" · ") };
+    return { owner: false, name: job.name, detail: parts.join("  ·  ") };
+}
+
+// Badges affichés sous le nom (les plus prestigieux d'abord)
+function badgesFor(economy, data, rank, business) {
+    const badges = [];
+    if (data.level <= 1 && data.xp === 0) rank = null; // pas de badge de rang sans activité
+    if (rank === 1) badges.push({ label: "N°1 du serveur", color: BADGE_COLORS.gold });
+    else if (rank && rank <= 3) badges.push({ label: "Top 3", color: BADGE_COLORS.gold });
+    else if (rank && rank <= 10) badges.push({ label: "Top 10", color: BADGE_COLORS.blue });
+
+    const awards = economy.countEmployeeAwards(data.userId);
+    if (awards) badges.push({ label: `Employé du mois ×${awards}`, color: BADGE_COLORS.gold });
+    if (business?.owner) badges.push({ label: "Patron", color: BADGE_COLORS.amber });
+
+    const wealth = data.money + data.bank;
+    if (wealth >= 100_000_000) badges.push({ label: "Milliardaire en herbe", color: BADGE_COLORS.purple });
+    else if (wealth >= 10_000_000) badges.push({ label: "Multimillionnaire", color: BADGE_COLORS.purple });
+    else if (wealth >= 1_000_000) badges.push({ label: "Millionnaire", color: BADGE_COLORS.purple });
+
+    if (data.dailyStreak >= 7) badges.push({ label: "Assidu", color: BADGE_COLORS.green });
+    if (data.drinks >= 20) badges.push({ label: "Habitué du bar", color: BADGE_COLORS.amber });
+
+    const drunk = ivresseState(economy.getIvresse(data.userId));
+    if (drunk.workFail > 0) badges.push({ label: drunk.label, color: BADGE_COLORS.red });
+    return badges;
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
-
         .setName("profil")
-
         .setDescription("Affiche ton profil")
-
         .addUserOption((option) => option.setName("joueur").setDescription("Le joueur").setRequired(false)),
 
     async execute(interaction) {
@@ -73,287 +77,40 @@ module.exports = {
 
         const member = await interaction.guild?.members.fetch(user.id).catch(() => null);
         const economy = interaction.client.economy;
+        const fresh = syncTitles(economy, user.id);
         const data = economy.getUser(user.id);
+        const title = equippedTitle(data);
         const rank = economy.levelRank(user.id);
-
-        const { moneyIcon, bankIcon, messageIcon, micIcon, trophyIcon, calendarIcon } = await getIcons();
-
-        const canvas = createCanvas(1100, 650);
-        const ctx = canvas.getContext("2d");
-
-        // ==========================
-        // FOND
-        // ==========================
-
-        const gradient = ctx.createLinearGradient(0, 0, 1100, 650);
-
-        gradient.addColorStop(0, "#0f172a");
-
-        gradient.addColorStop(1, "#1e293b");
-
-        ctx.fillStyle = gradient;
-
-        ctx.fillRect(0, 0, 1100, 650);
-
-        ctx.beginPath();
-
-        ctx.roundRect(30, 30, 1040, 590, 30);
-
-        ctx.fillStyle = "#161d29";
-
-        ctx.fill();
-
-        // ==========================
-        // COULEUR DU NIVEAU
-        // ==========================
-
-        const accent = levelColor(data.level);
-
-        ctx.fillStyle = accent;
-
-        ctx.fillRect(30, 30, 1040, 10);
-
-        // ==========================
-        // AVATAR
-        // ==========================
-
-        const avatar = await loadImage(
-            user.displayAvatarURL({
-                extension: "png",
-
-                forceStatic: true,
-
-                size: 512
-            })
-        );
-
-        // Contour
-
-        ctx.beginPath();
-
-        ctx.arc(120, 120, 78, 0, Math.PI * 2);
-
-        ctx.fillStyle = accent;
-
-        ctx.fill();
-
-        // Avatar rond
-
-        ctx.save();
-
-        ctx.beginPath();
-
-        ctx.arc(120, 120, 70, 0, Math.PI * 2);
-
-        ctx.closePath();
-
-        ctx.clip();
-
-        ctx.drawImage(avatar, 50, 50, 140, 140);
-
-        ctx.restore();
-
-        // ==========================
-        // NOM
-        // ==========================
-
-        ctx.fillStyle = "white";
-
-        ctx.font = "bold 42px Poppins";
-
-        ctx.fillText(user.username, 240, 110);
-
-        // ==========================
-        // NIVEAU
-        // ==========================
-
-        ctx.font = "24px Poppins";
-
-        ctx.fillStyle = "#b8c1cc";
-
-        ctx.fillText("Niveau", 240, 160);
-
-        ctx.font = "bold 30px Poppins";
-
-        ctx.fillStyle = accent;
-
-        ctx.fillText(String(data.level), 350, 160);
-
-        // ==========================
-        // BARRE XP
-        // ==========================
-
-        const maxXP = xpForLevel(data.level);
-
-        const percent = Math.min(data.xp / maxXP, 1);
-
-        ctx.beginPath();
-
-        ctx.roundRect(240, 190, 420, 28, 14);
-
-        ctx.fillStyle = "#2c3444";
-
-        ctx.fill();
-
-        ctx.beginPath();
-
-        ctx.roundRect(240, 190, 420 * percent, 28, 14);
-
-        ctx.fillStyle = accent;
-
-        ctx.fill();
-
-        ctx.fillStyle = "white";
-
-        ctx.font = "18px Poppins";
-
-        ctx.fillText(`${data.xp} / ${maxXP} XP`, 360, 210);
-        // ==========================
-        // COLONNE DE DROITE
-        // ==========================
-
-        const days = Math.floor((Date.now() - (member?.joinedTimestamp ?? Date.now())) / 86400000);
-
-        // Rang
-        ctx.drawImage(trophyIcon, 720, 75, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Rang", 765, 98);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 28px Poppins";
-        ctx.fillText(`#${rank}`, 930, 98);
-
-        // Daily
-        ctx.drawImage(calendarIcon, 720, 145, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Daily", 765, 168);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 28px Poppins";
-        ctx.fillText(`${data.dailyStreak}/10`, 930, 168);
-
-        // Depuis
-        ctx.drawImage(micIcon, 720, 215, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Depuis", 765, 238);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 28px Poppins";
-        ctx.fillText(`${days} jours`, 930, 238);
-
-        // Ligne de séparation
-
-        ctx.strokeStyle = "#2d3748";
-        ctx.lineWidth = 2;
-
-        ctx.beginPath();
-        ctx.moveTo(60, 290);
-        ctx.lineTo(1040, 290);
-        ctx.stroke();
-        // ==========================
-        // STATISTIQUES
-        // ==========================
-
-        const voice = data.voiceTime || 0;
-
-        const hours = Math.floor(voice / 3600);
-
-        const minutes = Math.floor((voice % 3600) / 60);
-
-        // Argent
-
-        ctx.drawImage(moneyIcon, 60, 340, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Argent", 105, 364);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 24px Poppins";
-        ctx.fillText(`${data.money.toLocaleString()} $`, 250, 364);
-
-        // Banque
-
-        ctx.drawImage(bankIcon, 60, 410, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Banque", 105, 434);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 24px Poppins";
-        ctx.fillText(`${(data.bank || 0).toLocaleString()} $`, 250, 434);
-
-        // Messages
-
-        ctx.drawImage(messageIcon, 60, 480, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Messages", 105, 504);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 24px Poppins";
-        ctx.fillText(`${(data.messages || 0).toLocaleString()}`, 250, 504);
-
-        // Vocal
-
-        ctx.drawImage(micIcon, 560, 340, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Vocal", 605, 364);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 24px Poppins";
-        ctx.fillText(`${hours}h ${minutes}m`, 760, 364);
-
-        // Arrivée
-
-        ctx.drawImage(calendarIcon, 560, 410, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Arrivé", 605, 434);
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 24px Poppins";
-        ctx.fillText(member?.joinedAt ? member.joinedAt.toLocaleDateString("fr-FR") : "—", 760, 434);
-
-        // Entreprise (patron ou employé)
-
         const business = businessInfo(economy, user.id);
+        const joinedAt = member?.joinedAt ?? null;
 
-        ctx.drawImage(bankIcon, 560, 480, 30, 30);
-
-        ctx.fillStyle = "#aab4c3";
-        ctx.font = "22px Poppins";
-        ctx.fillText("Entreprise", 605, 504);
-
-        ctx.fillStyle = business ? "white" : "#6b7585";
-        ctx.font = "bold 24px Poppins";
-        ctx.fillText(fitText(ctx, business ? business.name : "Aucune", 270), 760, 504);
-
-        if (business) {
-            ctx.fillStyle = business.owner ? accent : "#aab4c3";
-            ctx.font = "18px Poppins";
-            ctx.fillText(fitText(ctx, business.detail, 430), 605, 538);
-        }
-
-        // ==========================
-        // ENVOI
-        // ==========================
-
-        const attachment = new AttachmentBuilder(await canvas.encode("png"), {
-            name: "profil.png"
+        const png = await renderProfile({
+            username: user.username,
+            displayName: member?.displayName || user.globalName || user.username,
+            avatarUrl: (member ?? user).displayAvatarURL({ extension: "png", forceStatic: true, size: 512 }),
+            accent: levelColor(data.level),
+            level: data.level,
+            xp: data.xp,
+            xpMax: xpForLevel(data.level),
+            rank,
+            money: data.money,
+            bank: data.bank || 0,
+            messages: data.messages || 0,
+            voiceSeconds: data.voiceTime || 0,
+            dailyStreak: Math.min(data.dailyStreak, ECONOMY.DAILY_STREAK_MAX),
+            dailyMax: ECONOMY.DAILY_STREAK_MAX,
+            joinedAt,
+            memberDays: joinedAt ? Math.floor((Date.now() - joinedAt.getTime()) / 86400000) : 0,
+            badges: badgesFor(economy, data, rank, business),
+            title: title && { name: title.name, color: RARITIES[title.rarity].color },
+            business
         });
 
-        await interaction.editReply({ files: [attachment] });
+        // Nouveaux titres : on ne l'annonce qu'au joueur concerné
+        const notice = user.id === interaction.user.id ? newTitlesText(fresh) : "";
+        await interaction.editReply({
+            content: notice || undefined,
+            files: [new AttachmentBuilder(png, { name: "profil.png" })]
+        });
     }
 };

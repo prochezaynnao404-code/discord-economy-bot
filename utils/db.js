@@ -26,7 +26,8 @@ const USER_COLUMNS = {
     ivresse: "INTEGER NOT NULL DEFAULT 0",
     ivresseAt: "INTEGER NOT NULL DEFAULT 0",
     drinks: "INTEGER NOT NULL DEFAULT 0",
-    drinksOffered: "INTEGER NOT NULL DEFAULT 0"
+    drinksOffered: "INTEGER NOT NULL DEFAULT 0",
+    title: "TEXT"
 };
 
 // Colonnes ajoutées aux tables existantes (entreprises v2)
@@ -169,6 +170,12 @@ function migrate(db) {
             contributed INTEGER NOT NULL,
             prize INTEGER NOT NULL,
             PRIMARY KEY (month, businessId)
+        );
+        CREATE TABLE IF NOT EXISTS user_titles (
+            userId TEXT NOT NULL,
+            titleId TEXT NOT NULL,
+            unlockedAt INTEGER NOT NULL,
+            PRIMARY KEY (userId, titleId)
         );
         CREATE TABLE IF NOT EXISTS drink_effects (
             userId TEXT NOT NULL,
@@ -613,6 +620,10 @@ class Economy {
         })();
     }
 
+    countEmployeeAwards(userId) {
+        return this.db.prepare("SELECT COUNT(*) AS n FROM employee_awards WHERE userId = ?").get(userId).n;
+    }
+
     topBusinesses(limit = 10) {
         return this.db
             .prepare(
@@ -692,6 +703,47 @@ class Economy {
         return this.db
             .prepare("SELECT userId, drinks, drinksOffered FROM users WHERE drinks > 0 ORDER BY drinks DESC LIMIT ?")
             .all(limit);
+    }
+
+    // ---------- Titres ----------
+
+    getUnlockedTitles(userId) {
+        return this.db
+            .prepare("SELECT titleId, unlockedAt FROM user_titles WHERE userId = ? ORDER BY unlockedAt")
+            .all(userId);
+    }
+
+    hasTitle(userId, titleId) {
+        return !!this.db.prepare("SELECT 1 FROM user_titles WHERE userId = ? AND titleId = ?").get(userId, titleId);
+    }
+
+    // Renvoie les identifiants réellement nouveaux
+    unlockTitles(userId, titleIds, now = Date.now()) {
+        if (!titleIds.length) return [];
+        return this.db.transaction(() => {
+            const insert = this.db.prepare(
+                "INSERT OR IGNORE INTO user_titles (userId, titleId, unlockedAt) VALUES (?, ?, ?)"
+            );
+            return titleIds.filter((id) => insert.run(userId, id, now).changes === 1);
+        })();
+    }
+
+    // "ok" | "owned" | "money"
+    buyTitle(userId, titleId, price, now = Date.now()) {
+        return this.db.transaction(() => {
+            if (this.hasTitle(userId, titleId)) return "owned";
+            if (!this.takeMoney(userId, price)) return "money";
+            this.unlockTitles(userId, [titleId], now);
+            return "ok";
+        })();
+    }
+
+    // titleId null = retirer le titre. Refuse un titre non débloqué.
+    equipTitle(userId, titleId) {
+        if (titleId !== null && !this.hasTitle(userId, titleId)) return false;
+        this.ensureUser(userId);
+        this.db.prepare("UPDATE users SET title = ? WHERE userId = ?").run(titleId, userId);
+        return true;
     }
 
     // ---------- Inventaire ----------

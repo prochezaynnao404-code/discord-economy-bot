@@ -13,6 +13,7 @@ const { startWealthTax } = require("./utils/tax");
 const { startEmployeeOfMonth } = require("./utils/business");
 const { applyBonus } = require("./utils/levels");
 const { announceLevelUp } = require("./utils/levelRender");
+const { setBrand } = require("./utils/theme");
 
 const ECO = config.ECONOMY;
 
@@ -173,6 +174,7 @@ setInterval(() => {
 
 client.once(Events.ClientReady, () => {
     console.log(`✅ Connecté : ${client.user.tag}`);
+    setBrand(client.user); // signature du bot en pied de page des embeds
 
     // Reprendre le comptage des membres déjà en vocal au démarrage
     const now = Date.now();
