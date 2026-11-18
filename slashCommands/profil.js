@@ -56,6 +56,9 @@ function badgesFor(economy, data, rank, business) {
     if (data.dailyStreak >= 7) badges.push({ label: "Assidu", color: BADGE_COLORS.green });
     if (data.drinks >= 20) badges.push({ label: "Habitué du bar", color: BADGE_COLORS.amber });
 
+    if (data.heistsWon >= 5) badges.push({ label: "Braqueur", color: BADGE_COLORS.red });
+    if (economy.getJail(data.userId)) badges.push({ label: "En prison", color: BADGE_COLORS.red });
+
     const drunk = ivresseState(economy.getIvresse(data.userId));
     if (drunk.workFail > 0) badges.push({ label: drunk.label, color: BADGE_COLORS.red });
     return badges;

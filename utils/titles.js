@@ -24,6 +24,7 @@ const CATEGORIES = {
     entreprise: "🏢 Entreprise",
     bar: "🍻 Bar",
     jeux: "🎮 Jeux",
+    crime: "🦹 Crime",
     boutique: "🛒 Boutique"
 };
 
@@ -242,6 +243,53 @@ const TITLES = [
         value: (c) => c.gameWins
     },
 
+    // Crime (braquages en équipe)
+    {
+        id: "complice",
+        name: "Complice",
+        rarity: "commun",
+        category: "crime",
+        hint: "Participer à un braquage en équipe",
+        goal: 1,
+        value: (c) => c.heists
+    },
+    {
+        id: "taulard",
+        name: "Taulard",
+        rarity: "commun",
+        category: "crime",
+        hint: "Aller 3 fois en prison",
+        goal: 3,
+        value: (c) => c.jailCount
+    },
+    {
+        id: "braqueur",
+        name: "Braqueur",
+        rarity: "rare",
+        category: "crime",
+        hint: "Réussir 5 braquages en équipe",
+        goal: 5,
+        value: (c) => c.heistsWon
+    },
+    {
+        id: "ennemipublic",
+        name: "Ennemi public n°1",
+        rarity: "epique",
+        category: "crime",
+        hint: "Réussir 25 braquages en équipe",
+        goal: 25,
+        value: (c) => c.heistsWon
+    },
+    {
+        id: "cerveau",
+        name: "Cerveau du crime",
+        rarity: "legendaire",
+        category: "crime",
+        hint: "Amasser 10 000 000 $ en braquages",
+        goal: 10 * M,
+        value: (c) => c.heistLoot
+    },
+
     // Boutique
     { id: "baron", name: "Baron", rarity: "rare", category: "boutique", price: 10 * M },
     { id: "comte", name: "Comte", rarity: "epique", category: "boutique", price: 50 * M },
@@ -270,7 +318,11 @@ function titleContext(economy, userId) {
         awards: economy.countEmployeeAwards(userId),
         drinks: user.drinks,
         drinksOffered: user.drinksOffered,
-        gameWins: games.reduce((sum, g) => sum + g.wins, 0)
+        gameWins: games.reduce((sum, g) => sum + g.wins, 0),
+        heists: user.heists,
+        heistsWon: user.heistsWon,
+        heistLoot: user.heistLoot,
+        jailCount: user.jailCount
     };
 }
 

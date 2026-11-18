@@ -27,7 +27,14 @@ const USER_COLUMNS = {
     ivresseAt: "INTEGER NOT NULL DEFAULT 0",
     drinks: "INTEGER NOT NULL DEFAULT 0",
     drinksOffered: "INTEGER NOT NULL DEFAULT 0",
-    title: "TEXT"
+    title: "TEXT",
+    lastHeist: "INTEGER NOT NULL DEFAULT 0",
+    heists: "INTEGER NOT NULL DEFAULT 0",
+    heistsWon: "INTEGER NOT NULL DEFAULT 0",
+    heistLoot: "INTEGER NOT NULL DEFAULT 0",
+    jailUntil: "INTEGER NOT NULL DEFAULT 0",
+    jailBail: "INTEGER NOT NULL DEFAULT 0",
+    jailCount: "INTEGER NOT NULL DEFAULT 0"
 };
 
 // Colonnes ajoutées aux tables existantes (entreprises v2)
@@ -744,6 +751,78 @@ class Economy {
         this.ensureUser(userId);
         this.db.prepare("UPDATE users SET title = ? WHERE userId = ?").run(titleId, userId);
         return true;
+    }
+
+    // ---------- Braquage en équipe et prison ----------
+
+    // null si libre, sinon { until, remaining, bail }
+    getJail(userId, now = Date.now()) {
+        const u = this.findUser(userId);
+        if (!u || u.jailUntil <= now) return null;
+        return { until: u.jailUntil, remaining: u.jailUntil - now, bail: u.jailBail };
+    }
+
+    // Vérifie une recrue (sans rien modifier) : null si OK, sinon { reason, remaining }
+    heistBlocker(userId, { fee, cooldown }, now = Date.now()) {
+        const u = this.getUser(userId);
+        if (u.jailUntil > now) return { reason: "jail", remaining: u.jailUntil - now };
+        if (u.lastHeist + cooldown > now) return { reason: "cooldown", remaining: u.lastHeist + cooldown - now };
+        if (u.money < fee) return { reason: "money", remaining: 0 };
+        return null;
+    }
+
+    // Départ du braquage : tout le monde paie le matériel, ou personne
+    startHeist(userIds, { fee, cooldown }, now = Date.now()) {
+        return this.db.transaction(() => {
+            const problems = [];
+            for (const userId of userIds) {
+                const blocker = this.heistBlocker(userId, { fee, cooldown }, now);
+                if (blocker) problems.push({ userId, ...blocker });
+            }
+            if (problems.length) return { ok: false, problems };
+            const start = this.db.prepare(
+                "UPDATE users SET money = money - ?, lastHeist = ?, heists = heists + 1 WHERE userId = ?"
+            );
+            for (const userId of userIds) start.run(fee, now, userId);
+            return { ok: true, problems: [] };
+        })();
+    }
+
+    // outcomes : [{ userId, caught, gain }]
+    finishHeist(outcomes, { jail, bail }, now = Date.now()) {
+        this.db.transaction(() => {
+            const arrest = this.db.prepare(
+                "UPDATE users SET jailUntil = ?, jailBail = ?, jailCount = jailCount + 1 WHERE userId = ?"
+            );
+            const pay = this.db.prepare(
+                "UPDATE users SET money = money + ?, heistsWon = heistsWon + 1, heistLoot = heistLoot + ? WHERE userId = ?"
+            );
+            for (const o of outcomes) {
+                this.ensureUser(o.userId);
+                if (o.caught) arrest.run(now + jail, bail, o.userId);
+                else if (o.gain > 0) pay.run(o.gain, o.gain, o.userId);
+            }
+        })();
+    }
+
+    // La caution est détruite. { status: "free" | "money" | "ok", bail }
+    payBail(userId, now = Date.now()) {
+        return this.db.transaction(() => {
+            const jail = this.getJail(userId, now);
+            if (!jail) return { status: "free", bail: 0 };
+            if (!this.takeMoney(userId, jail.bail)) return { status: "money", bail: jail.bail };
+            this.db.prepare("UPDATE users SET jailUntil = 0, jailBail = 0 WHERE userId = ?").run(userId);
+            return { status: "ok", bail: jail.bail };
+        })();
+    }
+
+    topHeisters(limit = 10) {
+        return this.db
+            .prepare(
+                "SELECT userId, heists, heistsWon, heistLoot, jailCount FROM users WHERE heists > 0 " +
+                    "ORDER BY heistLoot DESC, heistsWon DESC LIMIT ?"
+            )
+            .all(limit);
     }
 
     // ---------- Inventaire ----------

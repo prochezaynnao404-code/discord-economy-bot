@@ -7,6 +7,7 @@ const { applyBonus, levelBonus, formatBonus } = require("../utils/levels");
 const { BUSINESS } = require("../utils/business");
 const { ivresseState } = require("../utils/bar");
 const { syncTitles, newTitlesText } = require("../utils/titles");
+const { jailNotice } = require("../utils/heist");
 
 const JOBS = [
     { name: "🚕 Chauffeur", word: "LIVRAISON" },
@@ -32,6 +33,9 @@ module.exports = {
         }
 
         try {
+            const jail = economy.getJail(userId);
+            if (jail) return interaction.reply({ content: jailNotice(jail), flags: EPHEMERAL });
+
             // Cooldown stocké en base : il survit aux redémarrages
             const remaining = economy.tryCooldown(userId, "lastWork", ECONOMY.WORK_COOLDOWN);
             if (remaining > 0) {

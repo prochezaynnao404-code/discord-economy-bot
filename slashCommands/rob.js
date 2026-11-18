@@ -3,6 +3,7 @@ const { EmbedBuilder } = require("../utils/theme");
 
 const { ECONOMY } = require("../config");
 const { EPHEMERAL, money, duration, randInt, pick, shuffle, lockUser, unlockUser } = require("../utils/helpers");
+const { jailNotice } = require("../utils/heist");
 
 const WORDS = ["piratage", "banque", "discret", "infiltration", "alarme", "caméra", "coffre", "cagoule"];
 
@@ -36,6 +37,9 @@ module.exports = {
         }
 
         try {
+            const jail = economy.getJail(userId);
+            if (jail) return interaction.reply({ content: jailNotice(jail), flags: EPHEMERAL });
+
             // Le cooldown démarre dès la tentative : un échec compte aussi
             const remaining = economy.tryCooldown(userId, "lastRob", ECONOMY.ROB_COOLDOWN);
             if (remaining > 0) {
