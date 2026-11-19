@@ -26,6 +26,7 @@ const CATEGORIES = {
     jeux: "🎮 Jeux",
     crime: "🦹 Crime",
     art: "🎨 Art",
+    noel: "🎄 Noël",
     boutique: "🛒 Boutique"
 };
 
@@ -338,6 +339,26 @@ const TITLES = [
         value: (c) => c.drawBest
     },
 
+    // Noël
+    {
+        id: "lutin",
+        name: "Lutin de Noël",
+        rarity: "rare",
+        category: "noel",
+        hint: "Ouvrir 12 cases du calendrier de l'Avent la même année",
+        goal: 12,
+        value: (c) => c.adventBest
+    },
+    {
+        id: "perenoel",
+        name: "Père Noël",
+        rarity: "legendaire",
+        category: "noel",
+        hint: "Ouvrir les 24 cases du calendrier de l'Avent la même année",
+        goal: 24,
+        value: (c) => c.adventBest
+    },
+
     // Boutique
     { id: "baron", name: "Baron", rarity: "rare", category: "boutique", price: 10 * M },
     { id: "comte", name: "Comte", rarity: "epique", category: "boutique", price: 50 * M },
@@ -374,7 +395,8 @@ function titleContext(economy, userId) {
         works: economy.getDrawings(userId).length,
         likes: economy.likesReceived(userId),
         drawGuesses: user.drawGuesses,
-        drawBest: user.drawBest
+        drawBest: user.drawBest,
+        adventBest: economy.adventBest(userId)
     };
 }
 

@@ -6,6 +6,7 @@ const { xpForLevel, levelFromTotal } = require("./levels");
 const { UPGRADES, BOTS, businessStats, accruedPassive, monthKey } = require("./business");
 const { DRINKS, IVRESSE, currentIvresse } = require("./bar");
 const { DRAWING } = require("./drawing");
+const { doorReward } = require("./advent");
 
 // Colonnes de la table users : ajoutées automatiquement si elles manquent
 const USER_COLUMNS = {
@@ -210,6 +211,16 @@ function migrate(db) {
             expiresAt INTEGER NOT NULL,
             drink TEXT NOT NULL,
             PRIMARY KEY (userId, effect)
+        );
+        CREATE TABLE IF NOT EXISTS advent_doors (
+            userId TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            day INTEGER NOT NULL,
+            money INTEGER NOT NULL,
+            xp INTEGER NOT NULL,
+            golden INTEGER NOT NULL DEFAULT 0,
+            openedAt INTEGER NOT NULL,
+            PRIMARY KEY (userId, year, day)
         );
         CREATE INDEX IF NOT EXISTS idx_users_money ON users(money DESC);
         CREATE INDEX IF NOT EXISTS idx_users_level ON users(level DESC, xp DESC);
@@ -944,6 +955,56 @@ class Economy {
                 "SELECT userId, drawBest, drawGames, drawGuesses FROM users WHERE drawGames > 0 ORDER BY drawBest DESC LIMIT ?"
             )
             .all(limit);
+    }
+
+    // ---------- Calendrier de l'Avent ----------
+
+    getAdventDoors(userId, year) {
+        return this.db
+            .prepare(
+                "SELECT day, money, xp, golden, openedAt FROM advent_doors WHERE userId = ? AND year = ? ORDER BY day"
+            )
+            .all(userId, year);
+    }
+
+    // Ouvre la case `day` de l'année `year`. Renvoie { ok: false } si elle est déjà ouverte.
+    openAdventDoor(userId, year, day, { multiplier = 1, roll = Math.random() } = {}, now = Date.now()) {
+        return this.db.transaction(() => {
+            this.ensureUser(userId);
+            const opened = this.db
+                .prepare("SELECT COUNT(*) AS n FROM advent_doors WHERE userId = ? AND year = ?")
+                .get(userId, year).n;
+            const reward = doorReward(day, { multiplier, roll, opened });
+            const insert = this.db
+                .prepare(
+                    "INSERT OR IGNORE INTO advent_doors (userId, year, day, money, xp, golden, openedAt) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                )
+                .run(userId, year, day, reward.money, reward.xp, reward.golden ? 1 : 0, now);
+            if (insert.changes === 0) return { ok: false };
+            this.addMoney(userId, reward.money);
+            const level = this.addXp(userId, reward.xp);
+            return { ok: true, ...reward, opened: opened + 1, level };
+        })();
+    }
+
+    // Meilleur nombre de cases ouvertes sur une même année (pour les titres)
+    adventBest(userId) {
+        return (
+            this.db
+                .prepare(
+                    "SELECT COUNT(*) AS n FROM advent_doors WHERE userId = ? GROUP BY year ORDER BY n DESC LIMIT 1"
+                )
+                .get(userId)?.n ?? 0
+        );
+    }
+
+    topAdvent(year, limit = 10) {
+        return this.db
+            .prepare(
+                `SELECT userId, COUNT(*) AS doors, SUM(money) AS money FROM advent_doors WHERE year = ?
+                 GROUP BY userId ORDER BY doors DESC, money DESC LIMIT ?`
+            )
+            .all(year, limit);
     }
 
     // ---------- Inventaire ----------
