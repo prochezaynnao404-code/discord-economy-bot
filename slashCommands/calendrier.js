@@ -3,81 +3,83 @@ const { EmbedBuilder } = require("../utils/theme");
 
 const { EPHEMERAL, money } = require("../utils/helpers");
 const { levelBonus } = require("../utils/levels");
-const { ADVENT, doorContent, calendarState } = require("../utils/advent");
+const { ADVENT, calendarState } = require("../utils/advent");
+const { renderAdvent } = require("../utils/adventRender");
 const { syncTitles, newTitlesText } = require("../utils/titles");
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const NO_PINGS = { parse: [] };
 
-// Grille 4 × 6 : contenu des cases ouvertes, 🎁 aujourd'hui, ❌ ratée, 🔒 à venir
-function grid(doors, today) {
-    const opened = new Set(doors.map((d) => d.day));
-    const lines = [];
-    for (let row = 0; row < 4; row++) {
-        const cells = [];
-        for (let col = 1; col <= 6; col++) {
-            const day = row * 6 + col;
-            let icon;
-            if (opened.has(day)) icon = doorContent(day).emoji;
-            else if (day === today) icon = "🎁";
-            else if (today && day < today) icon = "❌";
-            else icon = "🔒";
-            cells.push(`\`${String(day).padStart(2, "0")}\`${icon}`);
-        }
-        lines.push(cells.join("  "));
-    }
-    return lines.join("\n");
+// Case du jour pour le dessin : 0 = pas encore commencé, 25 = terminé
+function todayOf(state) {
+    if (state.phase === "ouvert") return state.day;
+    return state.phase === "termine" ? ADVENT.DAYS + 1 : 0;
 }
 
-function calendarEmbed(economy, user, state) {
+// Image + embed du calendrier
+async function calendarView(economy, user, state) {
     const doors = economy.getAdventDoors(user.id, state.year);
-    const total = doors.reduce((sum, d) => sum + d.money, 0);
-    const today = state.phase === "ouvert" ? state.day : state.phase === "termine" ? ADVENT.DAYS + 1 : 0;
-    const openedToday = doors.some((d) => d.day === state.day);
+    const openedToday = state.phase === "ouvert" && doors.some((d) => d.day === state.day);
 
+    let subtitle;
     let status;
-    if (state.phase === "ouvert") {
-        status = openedToday
-            ? "✅ Tu as déjà ouvert la case du jour. Reviens demain !"
-            : `🎁 La case n°**${state.day}** t'attend !`;
+    if (state.phase === "avant") {
+        subtitle = `${user.username} · ouverture le 1er décembre`;
+        status = `🔒 Le calendrier ouvre le **1er décembre**, <t:${Math.floor(state.startsAt / 1000)}:R>.`;
+    } else if (state.phase === "termine") {
+        subtitle = `${user.username} · Joyeux Noël !`;
+        status = "🎅 Le calendrier est terminé. **Joyeux Noël !**";
+    } else if (openedToday) {
+        subtitle = `${user.username} · reviens demain !`;
+        status = "✅ Case du jour ouverte. Reviens demain pour la suivante !";
     } else {
-        status = "🎅 Le calendrier est terminé. Joyeux Noël !";
+        subtitle = `${user.username} · case n°${state.day} à ouvrir`;
+        status = `🎁 La case n°**${state.day}** t'attend ! Clique sur le bouton pour l'ouvrir.`;
     }
 
-    return new EmbedBuilder()
+    const image = await renderAdvent({
+        year: state.year,
+        doors,
+        today: todayOf(state),
+        user: { name: user.username, avatarURL: user.displayAvatarURL({ extension: "png", size: 128 }) },
+        subtitle
+    });
+    const embed = new EmbedBuilder()
         .setColor("DarkRed")
         .setTitle(`🎄 Calendrier de l'Avent ${state.year}`)
         .setDescription(
-            `${grid(doors, today)}\n\n${status}\n\n` +
-                `📦 Cases ouvertes : **${doors.length}/${ADVENT.DAYS}**\n` +
-                `💰 Total gagné : **${money(total)}**\n\n` +
-                `_Une case par jour, à ouvrir le jour même. Ouvre les ${ADVENT.DAYS} cases pour la hotte complète ` +
-                `(**+${money(ADVENT.FULL_BONUS)}**) et le titre Père Noël !_`
+            `${status}\n\n` +
+                `🎫 Ticket d'or : gains ×${ADVENT.GOLDEN_MULTIPLIER} · ⭐ cases spéciales les 6, 12, 18 et 24\n` +
+                `🛷 Les ${ADVENT.DAYS} cases : hotte complète **+${money(ADVENT.FULL_BONUS)}** et titre **Père Noël**`
         )
-        .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() });
+        .setImage("attachment://calendrier.png");
+    return { embeds: [embed], files: [image] };
 }
 
-function openRow(state, disabled) {
+function openRow(state) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId("advent:open")
             .setLabel(`Ouvrir la case n°${state.day}`)
             .setEmoji("🎁")
             .setStyle(ButtonStyle.Success)
-            .setDisabled(disabled)
     );
 }
 
-function rewardText(result, user) {
+function rewardEmbed(result, user, titles) {
     const { door } = result;
-    const lines = [
-        `${door.emoji} **${user.username}** ouvre la case n°**${door.day}** : ${door.label}${door.special ? " ✨" : ""} !`,
-        `💰 **${money(result.money - (result.full ? ADVENT.FULL_BONUS : 0))}** · ✨ **${result.xp} XP**`
-    ];
+    const base = result.money - (result.full ? ADVENT.FULL_BONUS : 0);
+    const lines = [`💰 **+${money(base)}**   ✨ **+${result.xp} XP**`];
     if (result.golden) lines.push(`🎫 **Ticket d'or !** Gains ×${ADVENT.GOLDEN_MULTIPLIER} !`);
     if (result.full) lines.push(`🛷 **Hotte complète !** 24/24 cases : **+${money(ADVENT.FULL_BONUS)}** !`);
     if (result.level.leveledUp) lines.push(`⬆️ Niveau **${result.level.level}** atteint !`);
-    return lines.join("\n");
+    if (titles) lines.push(titles);
+    return new EmbedBuilder()
+        .setColor(result.golden || door.special ? "Gold" : "DarkGreen")
+        .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
+        .setTitle(`${door.emoji} Case n°${door.day} : ${door.label}${door.special ? " ✨" : ""}`)
+        .setDescription(lines.join("\n\n"))
+        .setFooter({ text: `${result.opened}/${ADVENT.DAYS} cases ouvertes` });
 }
 
 module.exports = {
@@ -112,33 +114,18 @@ module.exports = {
             });
         }
 
-        if (state.phase === "avant") {
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor("DarkRed")
-                        .setTitle(`🎄 Calendrier de l'Avent ${state.year}`)
-                        .setDescription(
-                            `🔒 Le calendrier ouvre le **1er décembre**, <t:${Math.floor(state.startsAt / 1000)}:R>.\n\n` +
-                                `Chaque jour jusqu'au 24, ouvre une case pour gagner de l'argent et de l'XP. ` +
-                                `Certaines cases sont spéciales 🎅⛄🦌🌟 et un ticket d'or 🎫 peut tripler tes gains !`
-                        )
-                ],
-                flags: EPHEMERAL
-            });
-        }
+        // Le rendu de l'image peut dépasser les 3 s accordées par Discord
+        await interaction.deferReply(state.phase === "avant" ? { flags: EPHEMERAL } : {});
+        const canOpen =
+            state.phase === "ouvert" && !economy.getAdventDoors(user.id, state.year).some((d) => d.day === state.day);
 
-        const alreadyOpened = () => economy.getAdventDoors(user.id, state.year).some((d) => d.day === state.day);
-        const canOpen = state.phase === "ouvert" && !alreadyOpened();
-
-        const response = await interaction.reply({
-            embeds: [calendarEmbed(economy, user, state)],
-            components: canOpen ? [openRow(state, false)] : [],
-            withResponse: true
+        const message = await interaction.editReply({
+            ...(await calendarView(economy, user, state)),
+            components: canOpen ? [openRow(state)] : []
         });
         if (!canOpen) return;
 
-        const collector = response.resource.message.createMessageComponentCollector({ idle: 3 * 60 * 1000 });
+        const collector = message.createMessageComponentCollector({ idle: 3 * 60 * 1000 });
         collector.on("collect", async (i) => {
             try {
                 if (i.user.id !== user.id) {
@@ -166,11 +153,9 @@ module.exports = {
                 }
                 const titles = newTitlesText(syncTitles(economy, user.id));
                 collector.stop();
-                await i.update({ embeds: [calendarEmbed(economy, user, state)], components: [] });
-                await i.followUp({
-                    content: rewardText(result, user) + (titles ? `\n${titles}` : ""),
-                    allowedMentions: NO_PINGS
-                });
+                await i.deferUpdate();
+                await i.editReply({ ...(await calendarView(economy, user, state)), attachments: [], components: [] });
+                await i.followUp({ embeds: [rewardEmbed(result, user, titles)], allowedMentions: NO_PINGS });
             } catch (err) {
                 console.error("❌ Erreur calendrier :", err);
                 i.reply({ content: "❌ Une erreur est survenue.", flags: EPHEMERAL }).catch(() => {});
